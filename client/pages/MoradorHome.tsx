@@ -50,7 +50,13 @@ export default function ResidentHome() {
       const [perfil, resList, locList] = await Promise.all([getMeuPerfil(), getReservas(), getLocais()]);
       setUsuarioLogado(perfil);
       setLocaisDB(locList || []);
-      setReservas(resList?.filter((r) => r?.morador?.id === perfil?.id) || []);
+      
+      // Filtro mais robusto para evitar problemas de tipo (String vs Number)
+      const minhasReservas = Array.isArray(resList) 
+        ? resList.filter((r) => String(r?.morador?.id) === String(perfil?.id))
+        : [];
+        
+      setReservas(minhasReservas);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar dados.");
