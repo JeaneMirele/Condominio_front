@@ -1,0 +1,21 @@
+              ) : (
+                <div className="space-y-4">
+                  {/* Sorting Controls */}
+                  <div className="flex items-center justify-between bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+                    <h3 className="text-sm font-semibold text-gray-900">Síndicos</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600">Ordenar por:</span>
+                      <select
+                        value={syndicSortBy}
+                        onChange={(e) => setSyndicSortBy(e.target.value as "name" | "email" | "createdAt")}
+                        className="text-xs border border-gray-300 rounded px-2 py-1"
+                      >
+                        <option value="name">Nome</option>
+                        <option value="email">Email</option>
+                        <option value="createdAt">Data de Criação</option>
+                      </select>
+                      <button className="p-1 hover:bg-gray-100 rounded">
+                        <img src="/ordernar.png" className="w-4 h-4" alt="Ordenar" />
+                      </button>
+                    </div>
+                  </div>
