@@ -15,6 +15,15 @@ import {
   alterarSenha,
   clearSession,
 } from "@/services/api";
+import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, Home, Building2, UserCheck } from "lucide-react";
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  ResponsiveContainer, 
+  Tooltip, 
+  Legend 
+} from "recharts";
 import type {
   UnidadeDTOResponse,
   UsuarioDTOResponse
@@ -23,17 +32,19 @@ import type {
 export default function ManagerHome() {
   const navigate = useNavigate();
 
-  // ─── STADOS ──────────────────────────────────────────
+  // ─── ESTADOS ──────────────────────────────────────────
   const [loading, setLoading] = useState(true);
   const [usuarioLogado, setUsuarioLogado] = useState<UsuarioDTOResponse | null>(null);
 
   const [unidades, setUnidades] = useState<UnidadeDTOResponse[]>([]);
   const [moradores, setMoradores] = useState<UsuarioDTOResponse[]>([]);
 
-  const [activeTab, setActiveTab] = useState<"units">("units");
+  type ActiveTab = "overview" | "units" | "residents" | "perfil";
+  const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [selectedUnidade, setSelectedUnidade] = useState<UnidadeDTOResponse | null>(null);
 
   // ─── MENUS E MODAIS ──────────────────────────────────
+  const [showSidebar, setShowSidebar] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -67,6 +78,7 @@ export default function ManagerHome() {
   // Sorting state
   const [residentSortBy, setResidentSortBy] = useState<"name" | "email">("name");
 
+  const [searchTerm, setSearchTerm] = useState("");
   // Helper Errors
   const [actionError, setActionError] = useState("");
 
@@ -113,6 +125,20 @@ export default function ManagerHome() {
     });
   };
 
+  const NavItem = ({ id, label, icon: Icon }: { id: ActiveTab, label: string, icon: any }) => (
+    <button
+      onClick={() => { setActiveTab(id); setShowSidebar(false); }}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+        activeTab === id 
+        ? "bg-accent text-white shadow-lg shadow-accent/20 font-bold" 
+        : "text-gray-500 hover:bg-gray-100 font-medium"
+      }`}
+    >
+      <Icon className="w-5 h-5" />
+      <span>{label}</span>
+    </button>
+  );
+
   // ─── PERFIL DO GERENTE ───────────────────────────────
 
   async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -145,48 +171,44 @@ export default function ManagerHome() {
     setShowProfileMenu(false);
   }
 
-  async function handleUpdateProfile() {
-    if (!usuarioLogado) return;
+  async function handleSalvarPerfil() {
+    if (!usuarioLogado?.id) return;
     setSavingProfile(true);
     setActionError("");
     try {
+      // 1. Validar troca de senha if filled
+      const trocandoSenha = passwordForm.nova || passwordForm.atual || passwordForm.confirmacao;
+      if (trocandoSenha) {
+        if (!passwordForm.atual) throw new Error("Informe a senha atual para prosseguir.");
+        if (passwordForm.nova.length < 6) throw new Error("A nova senha deve ter pelo menos 6 caracteres.");
+        if (passwordForm.nova !== passwordForm.confirmacao) throw new Error("As novas senhas não coincidem.");
+      }
+
+      // 2. Atualizar Perfil
       const payload = {
         nome: editProfileForm.nome.trim(),
         email: editProfileForm.email.trim(),
         cpf: usuarioLogado.cpf,
-        telefone: editProfileForm.telefone.trim() || null,
+        telefone: editProfileForm.telefone.trim() || undefined,
         roles: usuarioLogado.roles || ["GERENTE"]
       };
-      await atualizarUsuario(usuarioLogado.id!, payload);
-      toast.success("Perfil do Gerente atualizado!");
-      setShowEditProfileModal(false);
+      await atualizarUsuario(usuarioLogado.id, payload);
+
+      // 3. Atualizar Senha
+      if (trocandoSenha) {
+        await alterarSenha({ 
+          senhaAtual: passwordForm.atual, 
+          novaSenha: passwordForm.nova 
+        });
+        setPasswordForm({ atual: "", nova: "", confirmacao: "" });
+      }
+
+      toast.success("Perfil e segurança atualizados!");
       carregarTudo();
     } catch (err: any) {
-      setActionError(err.message || "Falha ao salvar dados do perfil");
+      setActionError(err.message || "Erro ao salvar alterações.");
     } finally {
       setSavingProfile(false);
-    }
-  }
-
-  async function handleChangePassword() {
-    setActionError("");
-    if (!passwordForm.atual || !passwordForm.nova || !passwordForm.confirmacao) {
-      setActionError("Preencha todos os campos."); return;
-    }
-    if (passwordForm.nova.length < 6) {
-      setActionError("A nova senha deve ter pelo menos 6 caracteres."); return;
-    }
-    if (passwordForm.nova !== passwordForm.confirmacao) {
-      setActionError("As senhas não coincidem."); return;
-    }
-
-    try {
-      await alterarSenha({ senhaAtual: passwordForm.atual, novaSenha: passwordForm.nova });
-      toast.success("Senha alterada com sucesso!");
-      setShowChangePasswordModal(false);
-      setPasswordForm({ atual: "", nova: "", confirmacao: "" });
-    } catch (err: any) {
-      setActionError(err.message || "Falha ao alterar senha.");
     }
   }
 
@@ -325,78 +347,83 @@ export default function ManagerHome() {
 
   if (loading && !usuarioLogado) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 font-inter">
         <div className="flex flex-col items-center gap-2">
           <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Carregando informações...</p>
+          <p className="text-gray-500 text-sm font-medium">Carregando informações...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* HEADER */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6 lg:px-8 sm:py-6">
-          <div className="flex items-center justify-between gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 font-inter">
+      {/* Sidebar / Drawer Overlay */}
+      {showSidebar && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] transition-opacity animate-in fade-in duration-300" onClick={() => setShowSidebar(false)} />
+      )}
 
-            {/* Header / Config Gerente */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 relative">
-              <button
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 bg-accent rounded-lg flex-shrink-0 hover:bg-accent/90 transition-colors overflow-hidden"
+      {/* Sidebar / Drawer */}
+      <aside className={`fixed top-0 left-0 h-full w-80 bg-white z-[70] shadow-2xl transition-transform duration-300 transform ${showSidebar ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex flex-col h-full">
+          {/* Drawer Header */}
+          <div className="p-8 border-b border-gray-100 flex flex-col items-center text-center bg-gray-50/50">
+            <button onClick={() => setShowSidebar(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-6 h-6" />
+            </button>
+            
+            <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg mb-4 bg-white group">
+              <img 
+                src={usuarioLogado?.foto || "/icone.png"} 
+                className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${uploadingFoto ? 'opacity-30' : ''}`} 
+                alt="Perfil" 
+              />
+              <button 
+                onClick={() => { setActiveTab("perfil"); setShowSidebar(false); }}
+                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <img src={usuarioLogado?.foto || "/icone.png"} className="w-full h-full object-cover bg-white" alt="Perfil" />
+                <Camera className="w-6 h-6 text-white" />
+              </button>
+            </div>
+            
+            <h3 className="font-bold text-gray-900 text-lg mb-0.5">{usuarioLogado?.nome}</h3>
+            <p className="text-[10px] font-bold text-accent uppercase tracking-widest">{usuarioLogado?.roles?.[0] || 'Gerente'}</p>
+          </div>
+
+          {/* Drawer Links */}
+          <nav className="flex-1 p-4 space-y-2 mt-4">
+            <NavItem id="perfil" label="Configurações de Perfil" icon={Settings} />
+          </nav>
+
+          {/* Drawer Footer */}
+          <div className="p-4 border-t border-gray-100 mt-auto">
+            <button 
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 font-bold transition-all"
+            >
+              <LogOut className="w-5 h-5" />
+              <span>Sair do Sistema</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6 lg:px-8 sm:py-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <button
+                onClick={() => setShowSidebar(true)}
+                className="inline-flex items-center justify-center w-10 h-10 bg-gray-50 border border-gray-100 text-gray-600 rounded-xl flex-shrink-0 hover:bg-accent hover:text-white hover:border-accent transition-all duration-300"
+              >
+                <Menu className="w-6 h-6" />
               </button>
 
-              {showProfileMenu && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                  <div className="p-4 border-b border-gray-200 flex flex-col items-center text-center">
-                    <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-accent mb-2 bg-gray-100">
-                      <img
-                        src={usuarioLogado?.foto || "/icone.png"}
-                        className={`w-full h-full object-cover bg-white ${uploadingFoto ? 'opacity-30' : ''}`}
-                        alt="Perfil"
-                      />
-                      {uploadingFoto && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                      )}
-                      {!uploadingFoto && (
-                        <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-[10px] font-bold opacity-0 hover:opacity-100 cursor-pointer transition-opacity leading-tight">
-                          <input type="file" accept="image/*" className="hidden" onChange={handleTrocarFoto} />
-                          ALTERAR<br/>FOTO
-                        </label>
-                      )}
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-1">{usuarioLogado?.nome}</h3>
-                    <p className="text-xs font-semibold text-accent uppercase tracking-wider">{usuarioLogado?.roles?.[0]}</p>
-                  </div>
-                  <div className="p-3 bg-gray-50 flex flex-col gap-2">
-                    <button
-                      onClick={openEditProfile}
-                      className="w-full bg-white border border-gray-200 hover:border-accent hover:text-accent text-gray-700 font-bold text-xs py-2.5 rounded-lg transition-colors"
-                    >
-                      Editar Dados do Perfil
-                    </button>
-                    <button
-                      onClick={() => { setShowChangePasswordModal(true); setShowProfileMenu(false); }}
-                      className="w-full bg-accent hover:bg-accent/90 text-white font-bold text-xs py-2.5 rounded-lg transition-colors"
-                    >
-                      Alterar Senha
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <h1 className="text-lg font-bold text-gray-900 truncate sm:text-2xl">
+              <h1 className="text-lg font-bold text-gray-900 truncate sm:text-2xl tracking-tight">
                 Portal do Gerente
               </h1>
             </div>
 
-            {/* Actions globais */}
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => {
@@ -404,15 +431,9 @@ export default function ManagerHome() {
                   setActionError("");
                   setShowAddResidentModal(true);
                 }}
-                className="bg-accent hover:bg-accent/90 text-white font-medium text-xs sm:text-sm px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg transition-colors whitespace-nowrap"
+                className="bg-accent hover:bg-accent/90 text-white font-bold text-xs sm:text-sm px-3 py-2 sm:px-5 sm:py-3 rounded-xl transition-all shadow-md shadow-accent/20 active:scale-95 whitespace-nowrap"
               >
                 Adicionar Morador
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="text-accent hover:text-accent/80 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap"
-              >
-                Sair
               </button>
             </div>
           </div>
@@ -421,14 +442,118 @@ export default function ManagerHome() {
 
       {/* BODY CONTENT */}
       <main className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 sm:py-12">
-        <div className="flex gap-2 mb-6 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab("units")}
-            className={`px-4 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === "units" ? "border-accent text-accent" : "border-transparent text-gray-600 hover:text-gray-900"}`}
-          >
-            Unidades Residenciais ({unidades.length})
-          </button>
+        <div className="flex gap-2 mb-10 border-b border-gray-200 overflow-x-auto pb-px">
+          {(["overview", "units", "residents"] as ActiveTab[]).map((tab) => {
+            const labels: Record<ActiveTab, string> = {
+              overview: "Dashboard Geral",
+              units: `Unidades (${unidades.length})`,
+              residents: `Moradores (${moradores.length})`,
+              perfil: "Perfil"
+            };
+            return (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                className={`px-6 py-4 font-bold text-sm border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === tab ? "border-accent text-accent" : "border-transparent text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
         </div>
+
+        {/* ===================== OVERVIEW DASHBOARD ===================== */}
+        {activeTab === "overview" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { label: "Total de Unidades", value: unidades.length, color: "text-blue-500", bg: "bg-blue-50" },
+                { label: "Total de Moradores", value: moradores.length, color: "text-purple-500", bg: "bg-purple-50" },
+                { label: "Aptos Ocupados", value: unidades.filter(u => getMoradoresPorUnidade(u.id!).length > 0).length, color: "text-orange-500", bg: "bg-orange-50" },
+                { label: "Aptos Vazios", value: unidades.filter(u => getMoradoresPorUnidade(u.id!).length === 0).length, color: "text-accent", bg: "bg-accent/5" },
+              ].map(({ label, value, color, bg }) => (
+                <div key={label} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
+                  <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center mb-3`}>
+                    <span className={`text-2xl font-black ${color}`}>{value}</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Occupancy Table/Chart Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* STATUS GRÁFICO (PIE) */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Ocupação das Unidades</h3>
+                <div className="flex-1 min-h-[300px] relative">
+                  {unidades.length === 0 ? (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm italic">Sem dados de unidades</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Ocupadas', value: unidades.filter(u => getMoradoresPorUnidade(u.id!).length > 0).length, color: '#10b981' },
+                            { name: 'Vazias', value: unidades.filter(u => getMoradoresPorUnidade(u.id!).length === 0).length, color: '#f59e0b' },
+                          ].filter(d => d.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={70}
+                          outerRadius={100}
+                          paddingAngle={8}
+                          dataKey="value"
+                        >
+                          {
+                            [
+                              { name: 'Ocupadas', value: unidades.filter(u => getMoradoresPorUnidade(u.id!).length > 0).length, color: '#10b981' },
+                              { name: 'Vazias', value: unidades.filter(u => getMoradoresPorUnidade(u.id!).length === 0).length, color: '#f59e0b' },
+                            ].filter(d => d.value > 0).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} className="outline-none" />
+                            ))
+                          }
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}}
+                          formatter={(value: number) => [`${value} Unidades`, 'Quantidade']} 
+                        />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+
+              {/* QUICK INFO */}
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
+                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Informações Gerais</h3>
+                 <div className="space-y-4">
+                    <div className="p-5 bg-gray-50/50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white shadow-sm rounded-xl flex items-center justify-center">
+                             <Home className="w-5 h-5 text-accent" />
+                          </div>
+                          <span className="text-sm font-bold text-gray-600">Total de Unidades</span>
+                       </div>
+                       <span className="text-lg font-black text-gray-900">{unidades.length}</span>
+                    </div>
+                    <div className="p-5 bg-gray-50/50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-white shadow-sm rounded-xl flex items-center justify-center">
+                             <UserCheck className="w-5 h-5 text-orange-500" />
+                          </div>
+                          <span className="text-sm font-bold text-gray-600">Moradores Ativos</span>
+                       </div>
+                       <span className="text-lg font-black text-gray-900">{moradores.length}</span>
+                    </div>
+                 </div>
+              </div>
+
+            </div>
+          </div>
+        )}
 
         {/* ===================== VIEW UNITS / LIST ===================== */}
         {activeTab === "units" && !selectedUnidade && (
@@ -440,7 +565,7 @@ export default function ManagerHome() {
                   <div
                     key={unit.id}
                     onClick={() => setSelectedUnidade(unit)}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-all cursor-pointer hover:border-accent"
+                    className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center hover:shadow-lg transition-all cursor-pointer hover:border-accent group"
                   >
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Bloco {unit.bloco}</p>
                     <p className="text-3xl font-black text-gray-800 mb-3"># {unit.apartamento}</p>
@@ -460,7 +585,7 @@ export default function ManagerHome() {
 
             <button
               onClick={() => { setUnitFormData({ bloco: "", apartamento: "" }); setActionError(""); setShowAddUnitModal(true); }}
-              className="w-full bg-accent hover:bg-accent/90 text-white font-medium text-sm py-3 rounded-lg transition-colors border border-transparent"
+              className="w-full bg-accent hover:bg-accent/90 text-white font-bold text-sm py-4 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95"
             >
               Adicionar Nova Unidade
             </button>
@@ -472,7 +597,7 @@ export default function ManagerHome() {
           <div className="space-y-4 transition-all">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <button onClick={() => setSelectedUnidade(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium text-sm rounded-lg transition-colors">
+                <button onClick={() => setSelectedUnidade(null)} className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs uppercase tracking-widest rounded-xl transition-all">
                   &lt; Voltar
                 </button>
                 <h2 className="text-2xl font-bold text-gray-900">Bloco {selectedUnidade.bloco} - Apt {selectedUnidade.apartamento}</h2>
@@ -484,13 +609,13 @@ export default function ManagerHome() {
                     setActionError("");
                     setShowEditUnitModal(true);
                   }}
-                  className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-semibold"
+                  className="px-5 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
                 >
                   Editar Dados
                 </button>
                 <button
                   onClick={() => setShowDeleteUnitModal(true)}
-                  className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-sm font-semibold"
+                  className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
                 >
                   Deletar Unidade
                 </button>
@@ -498,7 +623,7 @@ export default function ManagerHome() {
             </div>
 
             {getMoradoresPorUnidade(selectedUnidade.id!).length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center ring-1 ring-inset ring-gray-100">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-10 text-center ring-1 ring-inset ring-gray-100">
                 <p className="text-gray-500 text-sm mb-4">A unidade está desocupada.</p>
                 <button
                   onClick={() => {
@@ -506,7 +631,7 @@ export default function ManagerHome() {
                     setActionError("");
                     setShowAddResidentModal(true);
                   }}
-                  className="bg-accent text-white font-bold text-sm px-6 py-2.5 rounded-lg inline-block hover:opacity-90 transition-opacity"
+                  className="bg-accent text-white font-bold text-sm px-8 py-4 rounded-2xl shadow-lg shadow-accent/20 hover:bg-accent/90 transition-all active:scale-95 inline-block"
                 >
                   Adicionar Morador
                 </button>
@@ -595,7 +720,7 @@ export default function ManagerHome() {
                           setActionError("");
                           setShowAddResidentModal(true);
                         }}
-                        className="w-full text-center border-2 border-dashed border-gray-300 hover:border-accent text-gray-500 hover:text-accent font-bold text-sm py-3 rounded-lg transition-colors cursor-pointer"
+                        className="w-full text-center border-2 border-dashed border-gray-200 hover:border-accent text-gray-400 hover:text-accent font-bold text-[10px] uppercase tracking-widest py-4 rounded-2xl transition-all cursor-pointer bg-gray-50/30"
                       >
                         Incluir Morador
                       </button>
@@ -608,32 +733,138 @@ export default function ManagerHome() {
             )}
           </div>
         )}
+
+        {/* ===================== VIEW ALL RESIDENTS ===================== */}
+        {activeTab === "residents" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-6 rounded-3xl border border-gray-100 shadow-sm transition-all focus-within:shadow-md">
+              <div className="relative w-full sm:max-w-md">
+                <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar morador por e-mail..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none"
+                />
+              </div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                {moradores.filter(m => m.email.toLowerCase().includes(searchTerm.toLowerCase())).length} de {moradores.length} registros
+              </p>
+            </div>
+
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Morador</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contato</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Unidade</th>
+                      <th className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {moradores
+                      .filter(m => m.email.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map((res) => (
+                        <tr key={res.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors group">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent font-bold">
+                                {res.nome.charAt(0)}
+                              </div>
+                              <span className="font-bold text-gray-800 tracking-tight">{res.nome}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-gray-600 uppercase tracking-tighter text-[11px] mb-0.5">{res.email}</span>
+                              <span className="text-xs text-gray-400">{res.telefone || '---'}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-center">
+                            {res.unidade ? (
+                              <span className="inline-block px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg text-xs font-black uppercase tracking-wider">
+                                B{res.unidade.bloco} - A{res.unidade.apartamento}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 text-[10px] font-bold uppercase">Sem Unidade</span>
+                            )}
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => {
+                                  setSelectedResident(res);
+                                  setResidentFormData({
+                                    nome: res.nome,
+                                    email: res.email,
+                                    cpf: res.cpf || "",
+                                    telefone: res.telefone || "",
+                                    id_unidade: res.unidade?.id?.toString() || ""
+                                  });
+                                  setShowEditResidentModal(true);
+                                }}
+                                className="p-2.5 bg-gray-50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-xl transition-all active:scale-95"
+                              >
+                                <Settings className="w-5 h-5" />
+                              </button>
+                              <button 
+                                onClick={() => { setSelectedResident(res); setShowDeleteResidentModal(true); }}
+                                className="p-2.5 bg-gray-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all active:scale-95"
+                              >
+                                <X className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    {moradores.filter(m => m.email.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-8 py-20 text-center text-gray-400 text-sm italic">
+                          Nenhum morador encontrado com esse e-mail.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ================= MODAIS ================= */}
 
       {/* Add / Edit UNIDADE */}
       {(showAddUnitModal || showEditUnitModal) && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 overflow-y-auto backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 my-8 shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-300 relative">
+            <button 
+              onClick={() => { setShowAddUnitModal(false); setShowEditUnitModal(false); }}
+              className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-2xl font-bold text-gray-900 tracking-tight mb-6">
               {showAddUnitModal ? "Criar Unidade" : "Editar Unidade"}
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">Bloco</label>
-                <input type="text" value={unitFormData.bloco} onChange={(e) => setUnitFormData({ ...unitFormData, bloco: e.target.value })} placeholder="Ex: A" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Bloco</label>
+                <input type="text" value={unitFormData.bloco} onChange={(e) => setUnitFormData({ ...unitFormData, bloco: e.target.value })} placeholder="Ex: A" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide"> N° Apartamento </label>
-                <input type="text" value={unitFormData.apartamento} onChange={(e) => setUnitFormData({ ...unitFormData, apartamento: e.target.value })} placeholder="Ex: 101" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent" />
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">N° Apartamento</label>
+                <input type="text" value={unitFormData.apartamento} onChange={(e) => setUnitFormData({ ...unitFormData, apartamento: e.target.value })} placeholder="Ex: 101" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none" />
               </div>
 
-              {actionError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg"><p className="text-xs text-red-700 font-medium">{actionError}</p></div>}
+              {actionError && <div className="p-4 bg-red-50 border border-red-100 rounded-2xl"><p className="text-xs text-red-700 font-bold">{actionError}</p></div>}
 
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => { setShowAddUnitModal(false); setShowEditUnitModal(false); }} className="flex-[1] bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold text-sm py-3 rounded-lg">Voltar</button>
-                <button onClick={showAddUnitModal ? handleAddUnidade : handleEditUnidade} className="flex-[2] bg-accent hover:opacity-90 text-white font-bold text-sm py-3 rounded-lg">Confirmar</button>
+              <div className="flex gap-4 pt-4">
+                <button onClick={() => { setShowAddUnitModal(false); setShowEditUnitModal(false); }} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm py-4 rounded-2xl transition-all">Voltar</button>
+                <button onClick={showAddUnitModal ? handleAddUnidade : handleEditUnidade} className="flex-[2] bg-accent hover:bg-accent/90 text-white font-bold text-sm py-4 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95">Confirmar</button>
               </div>
             </div>
           </div>
@@ -642,13 +873,16 @@ export default function ManagerHome() {
 
       {/* Delete UNIDADE */}
       {showDeleteUnitModal && selectedUnidade && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Atenção</h3>
-            <p className="text-sm text-gray-600 mb-6">Excluir Bloco {selectedUnidade.bloco} Apt {selectedUnidade.apartamento} permanentemente?</p>
-            <div className="flex gap-2">
-              <button onClick={() => setShowDeleteUnitModal(false)} className="flex-1 bg-gray-100 text-gray-900 font-bold py-3 rounded-lg">Voltar</button>
-              <button onClick={handleDeleteUnidade} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700">Deletar</button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-300 text-center">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <LogOut className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">Excluir Unidade</h3>
+            <p className="text-sm text-gray-500 mb-8 leading-relaxed">Excluir Bloco {selectedUnidade.bloco} Apt {selectedUnidade.apartamento} permanentemente?</p>
+            <div className="flex gap-4">
+              <button onClick={() => setShowDeleteUnitModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl transition-all">Voltar</button>
+              <button onClick={handleDeleteUnidade} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-red-200 transition-all active:scale-95">Deletar</button>
             </div>
           </div>
         </div>
@@ -656,10 +890,16 @@ export default function ManagerHome() {
 
       {/* Add / Edit MORADOR */}
       {(showAddResidentModal || showEditResidentModal) && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 overflow-y-auto backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 sm:p-8 my-8 shadow-2xl border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">
-              {showAddResidentModal ? "Matricular Morador" : "Modificar Ficha do Morador"}
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-300 relative">
+            <button 
+              onClick={() => { setShowAddResidentModal(false); setShowEditResidentModal(false); setSenhaGerada(""); }}
+              className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="text-2xl font-bold text-gray-900 tracking-tight mb-6">
+              {showAddResidentModal ? "Novo Morador" : "Editar Ficha"}
             </h3>
 
             {senhaGerada ? (
@@ -722,20 +962,20 @@ export default function ManagerHome() {
                   )}
                 </div>
 
-                <div className="mt-8 flex gap-3">
-                  <button
-                    onClick={() => { setShowAddResidentModal(false); setShowEditResidentModal(false); setSenhaGerada(""); }}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm py-3 rounded-lg transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={showAddResidentModal ? handleAddResident : handleEditResident}
-                    className="flex-[2] bg-accent hover:opacity-90 text-white font-bold text-sm py-3 rounded-lg transition-colors shadow-lg shadow-accent/30"
-                  >
-                    Salvar Cadastro
-                  </button>
-                </div>
+                  <div className="flex gap-4 pt-4">
+                    <button
+                      onClick={() => { setShowAddResidentModal(false); setShowEditResidentModal(false); setSenhaGerada(""); }}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm py-4 rounded-2xl transition-all"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      onClick={showAddResidentModal ? handleAddResident : handleEditResident}
+                      className="flex-[2] bg-accent hover:bg-accent/90 text-white font-bold text-sm py-4 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95"
+                    >
+                      Salvar Cadastro
+                    </button>
+                  </div>
               </>
             )}
           </div>
@@ -744,70 +984,99 @@ export default function ManagerHome() {
 
       {/* Delete MORADOR */}
       {showDeleteResidentModal && selectedResident && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center border-t-4 border-red-500">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Excluir Morador</h3>
-            <p className="text-sm text-gray-600 mb-6">Esta operação cancelará todo o vínculo e reservas do morador <b>{selectedResident.nome}</b>. Confirmar?</p>
-            <div className="flex gap-2">
-              <button onClick={() => setShowDeleteResidentModal(false)} className="flex-1 bg-gray-100 text-gray-900 font-bold py-3 rounded-lg">Cancelar</button>
-              <button onClick={handleDeleteResident} className="flex-1 bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700">Confirmar</button>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-300 text-center">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Users className="w-8 h-8" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">Excluir Morador</h3>
+            <p className="text-sm text-gray-500 mb-8 leading-relaxed">Esta operação cancelará todo o vínculo e reservas de <b>{selectedResident.nome}</b>. Confirmar?</p>
+            <div className="flex gap-4">
+              <button onClick={() => setShowDeleteResidentModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl transition-all">Cancelar</button>
+              <button onClick={handleDeleteResident} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-red-200 transition-all active:scale-95">Confirmar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* EDIT GERENTE Perfil Modals */}
-      {showEditProfileModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl my-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Dados do Gerente</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">Nome</label>
-                <input type="text" value={editProfileForm.nome} onChange={(e) => setEditProfileForm({ ...editProfileForm, nome: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+      {activeTab === "perfil" && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto relative px-4">
+          <div className="flex justify-center mb-16 border-b border-gray-100 pb-12">
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white flex-shrink-0 group">
+                <img 
+                  src={usuarioLogado?.foto || "/icone.png"} 
+                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`} 
+                  alt="Perfil" 
+                />
+                {uploadingFoto && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-sm">
+                    <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                  <Camera className="text-white w-8 h-8" />
+                </div>
+                <input type="file" id="foto-upload-page-ger" hidden accept="image/*" onChange={handleTrocarFoto} disabled={uploadingFoto} />
+                <label htmlFor="foto-upload-page-ger" className="absolute inset-0 cursor-pointer" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">E-mail Corporativo</label>
-                <input type="email" value={editProfileForm.email} disabled className="w-full px-3 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-500 cursor-not-allowed" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">Telefone Comercial</label>
-                <input type="tel" value={editProfileForm.telefone} onChange={(e) => setEditProfileForm({ ...editProfileForm, telefone: e.target.value })} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
-              </div>
-              {actionError && <p className="text-xs text-red-700 bg-red-50 border border-red-200 p-3 rounded-lg">{actionError}</p>}
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => setShowEditProfileModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 font-medium text-sm py-2.5 rounded-lg transition-colors">Voltar</button>
-                <button onClick={handleUpdateProfile} disabled={savingProfile} className="flex-[2] bg-accent hover:opacity-90 text-white font-medium text-sm py-2.5 rounded-lg transition-colors disabled:opacity-60">
-                  {savingProfile ? "Salvando..." : "Atualizar Cadastro"}
-                </button>
-              </div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Toque para alterar a foto</p>
             </div>
           </div>
-        </div>
-      )}
 
-      {showChangePasswordModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-8 shadow-2xl text-center">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Alterar Senha de Acesso</h3>
-            <div className="space-y-4 text-left">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">Senha Atual</label>
-                <input type="password" value={passwordForm.atual} onChange={(e) => setPasswordForm({ ...passwordForm, atual: e.target.value })} className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+          <div className="space-y-8">
+            <section className="pb-8">
+              <div className="space-y-8 text-left">
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nome Completo</label>
+                  <input type="text" value={editProfileForm.nome} onChange={(e) => setEditProfileForm({ ...editProfileForm, nome: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-600 uppercase ml-1">E-mail</label>
+                    <input type="email" value={editProfileForm.email} disabled className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold text-gray-500 cursor-not-allowed" />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-600 uppercase ml-1">Telefone Comercial</label>
+                    <input type="tel" value={editProfileForm.telefone} onChange={(e) => setEditProfileForm({ ...editProfileForm, telefone: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">Nova Senha</label>
-                <input type="password" value={passwordForm.nova} onChange={(e) => setPasswordForm({ ...passwordForm, nova: e.target.value })} className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
+            </section>
+
+            <section className="space-y-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-600 uppercase ml-1">Senha Atual</label>
+                  <input type="password" value={passwordForm.atual} onChange={(e) => setPasswordForm({ ...passwordForm, atual: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nova Senha</label>
+                  <input type="password" value={passwordForm.nova} onChange={(e) => setPasswordForm({ ...passwordForm, nova: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-600 uppercase ml-1">Confirmar Nova Senha</label>
+                  <input type="password" value={passwordForm.confirmacao} onChange={(e) => setPasswordForm({ ...passwordForm, confirmacao: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">Confirmar Senha</label>
-                <input type="password" value={passwordForm.confirmacao} onChange={(e) => setPasswordForm({ ...passwordForm, confirmacao: e.target.value })} className="w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent" />
-              </div>
-              {actionError && <p className="text-xs text-red-700 bg-red-50 p-2 rounded-lg">{actionError}</p>}
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button onClick={() => setShowChangePasswordModal(false)} className="flex-1 bg-gray-100 text-sm font-bold py-3 rounded-lg">Cancelar</button>
-              <button onClick={handleChangePassword} className="flex-1 bg-accent text-white font-bold py-3 text-sm rounded-lg hover:opacity-90">Salvar Mudança</button>
+              <p className="text-[10px] text-gray-400 italic ml-1">* Preencha os campos acima apenas se desejar alterar sua senha de acesso.</p>
+            </section>
+
+            <div className="pt-8 flex flex-col sm:flex-row items-center justify-end gap-4 sm:gap-6">
+              {actionError && <p className="text-xs text-red-500 font-bold">{actionError}</p>}
+              <button 
+                onClick={() => setActiveTab("units")}
+                className="w-full sm:w-auto px-8 py-5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-xs font-bold uppercase hover:bg-gray-50 hover:text-accent hover:border-accent transition-all active:scale-95"
+              >
+                Voltar
+              </button>
+              <button 
+                onClick={handleSalvarPerfil} 
+                disabled={savingProfile}
+                className="w-full sm:w-auto px-12 py-5 bg-accent text-white rounded-2xl text-sm font-bold uppercase hover:bg-accent/90 transition-all shadow-xl shadow-accent/20 active:scale-95 disabled:opacity-50"
+              >
+                {savingProfile ? "Salvando..." : "Salvar Alterações"}
+              </button>
             </div>
           </div>
         </div>

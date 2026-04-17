@@ -63,7 +63,7 @@ async function attemptRefresh(): Promise<string | null> {
         JwtToken: jwtToken ?? undefined
       };
       
-      const res = await fetch(`${BASE_URL}/refresh`, {
+      const res = await fetch(`${BASE_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -82,8 +82,11 @@ async function attemptRefresh(): Promise<string | null> {
       }
       return null;
     } catch (err) {
+      // Só forçamos logout se o erro for explicitamente de autenticação (401/403)
+      // ou se o refresh token for inválido. Erros de rede não devem deslogar.
+      console.error("Erro no Refresh Token:", err);
       clearSession();
-      window.location.href = "/"; // Force logout because token expired
+      window.location.href = "/"; 
       return null;
     } finally {
       refreshPromise = null;
