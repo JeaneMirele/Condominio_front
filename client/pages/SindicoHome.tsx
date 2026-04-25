@@ -655,7 +655,9 @@ export default function OwnerHome() {
                 Cadastrar Gerente
               </button>
             </div>
-            <TabelaUsuarios usuarios={gerentes} senhasProvisoras={senhasProvisoras} onEdit={abrirEditUser}
+            <TabelaUsuarios usuarios={gerentes} senhasProvisoras={senhasProvisoras}
+              onRefreshSenhas={() => setSenhasProvisoras(getSenhasProvisoras())}
+              onEdit={abrirEditUser}
               onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
           </div>
         )}
@@ -679,7 +681,9 @@ export default function OwnerHome() {
                 Cadastrar Síndico
               </button>
             </div>
-            <TabelaUsuarios usuarios={sindicos} senhasProvisoras={senhasProvisoras} onEdit={abrirEditUser}
+            <TabelaUsuarios usuarios={sindicos} senhasProvisoras={senhasProvisoras}
+              onRefreshSenhas={() => setSenhasProvisoras(getSenhasProvisoras())}
+              onEdit={abrirEditUser}
               onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
           </div>
         )}
@@ -958,9 +962,10 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
-function TabelaUsuarios({ usuarios, senhasProvisoras, onEdit, onDelete }: {
+function TabelaUsuarios({ usuarios, senhasProvisoras, onRefreshSenhas, onEdit, onDelete }: {
   usuarios: UsuarioDTOResponse[];
   senhasProvisoras: SenhasMap;
+  onRefreshSenhas: () => void;
   onEdit: (u: UsuarioDTOResponse) => void;
   onDelete: (u: UsuarioDTOResponse) => void;
 }) {
@@ -994,7 +999,7 @@ function TabelaUsuarios({ usuarios, senhasProvisoras, onEdit, onDelete }: {
                             {senhaGuardada}
                           </code>
                           <button
-                            onClick={() => { removerSenhaProvisora(u.id!); setSenhasProvisoras(getSenhasProvisoras()); setSenhaVisivel(null); }}
+                            onClick={() => { removerSenhaProvisora(u.id!); onRefreshSenhas(); setSenhaVisivel(null); }}
                             title="Marcar como anotada"
                             className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors px-1"
                           >

@@ -1056,7 +1056,15 @@ export default function ManagerHome() {
 
                                     (async () => {
                                       try {
-                                        await atualizarUsuario(m.id, { ...m, id_unidade: targetId });
+                                        await atualizarUsuario(m.id, {
+                                          nome: m.nome || "",
+                                          email: m.email || "",
+                                          cpf: m.cpf,
+                                          telefone: m.telefone,
+                                          endereco: m.endereco,
+                                          id_unidade: targetId,
+                                          roles: m.roles || ["MORADOR"]
+                                        });
                                         toast.success("Morador vinculado com sucesso!");
                                         setShowAddResidentModal(false);
                                         carregarTudo();
@@ -1116,7 +1124,15 @@ export default function ManagerHome() {
               <button
                 onClick={async () => {
                   try {
-                    await atualizarUsuario(residentToMove.id, { ...residentToMove, id_unidade: selectedUnidade.id! });
+                    await atualizarUsuario(residentToMove.id, {
+                      nome: residentToMove.nome || "",
+                      email: residentToMove.email || "",
+                      cpf: residentToMove.cpf,
+                      telefone: residentToMove.telefone,
+                      endereco: residentToMove.endereco,
+                      id_unidade: selectedUnidade.id!,
+                      roles: residentToMove.roles || ["MORADOR"]
+                    });
                     toast.success("Morador transferido com sucesso!");
                     setShowConfirmMoveModal(false);
                     setResidentToMove(null);
