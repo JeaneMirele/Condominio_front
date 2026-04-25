@@ -21,6 +21,7 @@ import {
   BASE_URL
 } from "@/services/api";
 import type { UsuarioDTOResponse, LocalDTO, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
+import { getSenhasProvisoras, salvarSenhaProvisora, removerSenhaProvisora, sincronizarSenhas, type SenhasMap } from "@/services/senhasProvisoras";
 import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar } from "lucide-react";
 import {
   PieChart,
@@ -71,6 +72,7 @@ export default function OwnerHome() {
   const [userFormData, setUserFormData] = useState({ nome: "", email: "", cpf: "", telefone: "" });
   const [addingRole, setAddingRole] = useState<"GERENTE" | "SINDICO">("GERENTE");
   const [senhaGerada, setSenhaGerada] = useState("");
+  const [senhasProvisoras, setSenhasProvisoras] = useState<SenhasMap>({});
 
   // ── Modais de local ──
   const [showAddLocalModal, setShowAddLocalModal] = useState(false);
@@ -130,6 +132,8 @@ export default function OwnerHome() {
       setUsuarioLogado(perfil);
       setGerentes(usuarios.filter((u) => u.roles?.some((r) => r.toUpperCase().includes("GERENTE"))));
       setSindicos(usuarios.filter((u) => u.roles?.some((r) => r.toUpperCase().includes("SINDICO"))));
+      sincronizarSenhas(usuarios);
+      setSenhasProvisoras(getSenhasProvisoras());
       setLocais(locaisList);
       setReservas(reservasList);
     } catch (err) {
@@ -164,16 +168,22 @@ export default function OwnerHome() {
     }
 
 
+    const cleanCpf = userFormData.cpf.replace(/\D/g, "");
+    const cleanTelefone = userFormData.telefone.replace(/\D/g, "");
+
     try {
       // Garantir que não estamos em modo edição
       const resp = await criarUsuario({
         nome: userFormData.nome,
         email: userFormData.email,
-        cpf: userFormData.cpf,
-        telefone: userFormData.telefone,
+        cpf: cleanCpf,
+        telefone: cleanTelefone || undefined,
         roles: [addingRole],
       });
-      setSenhaGerada(resp.senha ?? "");
+      const senha = resp.senha ?? "";
+      setSenhaGerada(senha);
+      if (resp.id && senha) salvarSenhaProvisora(resp.id, senha);
+      setSenhasProvisoras(getSenhasProvisoras());
       await carregarTudo();
       toast.success(`${addingRole === "GERENTE" ? "Gerente" : "Síndico"} criado com sucesso!`);
     } catch (err: any) {
@@ -645,7 +655,7 @@ export default function OwnerHome() {
                 Cadastrar Gerente
               </button>
             </div>
-            <TabelaUsuarios usuarios={gerentes} onEdit={abrirEditUser}
+            <TabelaUsuarios usuarios={gerentes} senhasProvisoras={senhasProvisoras} onEdit={abrirEditUser}
               onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
           </div>
         )}
@@ -669,7 +679,7 @@ export default function OwnerHome() {
                 Cadastrar Síndico
               </button>
             </div>
-            <TabelaUsuarios usuarios={sindicos} onEdit={abrirEditUser}
+            <TabelaUsuarios usuarios={sindicos} senhasProvisoras={senhasProvisoras} onEdit={abrirEditUser}
               onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
           </div>
         )}
@@ -948,37 +958,71 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
-function TabelaUsuarios({ usuarios, onEdit, onDelete }: {
+function TabelaUsuarios({ usuarios, senhasProvisoras, onEdit, onDelete }: {
   usuarios: UsuarioDTOResponse[];
+  senhasProvisoras: SenhasMap;
   onEdit: (u: UsuarioDTOResponse) => void;
   onDelete: (u: UsuarioDTOResponse) => void;
 }) {
+  const [senhaVisivel, setSenhaVisivel] = useState<number | null>(null);
   if (usuarios.length === 0) return <p className="text-gray-500 text-sm text-center py-12">Nenhum usuário encontrado.</p>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            {["Nome", "Email", "CPF", "Telefone", "Ações"].map((h) => (
+            {["Nome", "Email", "CPF", "Telefone", "Senha Provisória", "Ações"].map((h) => (
               <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 sm:text-sm">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {usuarios.map((u) => (
-            <tr key={u.id} className="border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-4 text-sm font-medium text-gray-900">{u.nome}</td>
-              <td className="px-4 py-4 text-sm text-gray-600">{u.email}</td>
-              <td className="px-4 py-4 text-sm text-gray-600">{u.cpf}</td>
-              <td className="px-4 py-4 text-sm text-gray-600">{u.telefone ?? "—"}</td>
-              <td className="px-4 py-4">
-                <div className="flex gap-2">
-                  <button onClick={() => onEdit(u)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95 border border-blue-100">Editar</button>
-                  <button onClick={() => onDelete(u)} className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95 border border-red-100">Excluir</button>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {usuarios.map((u) => {
+            const senhaGuardada = u.id ? senhasProvisoras[u.id] : undefined;
+            return (
+              <tr key={u.id} className="border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-4 text-sm font-medium text-gray-900">{u.nome}</td>
+                <td className="px-4 py-4 text-sm text-gray-600">{u.email}</td>
+                <td className="px-4 py-4 text-sm text-gray-600">{u.cpf}</td>
+                <td className="px-4 py-4 text-sm text-gray-600">{u.telefone ?? "—"}</td>
+                <td className="px-4 py-4">
+                  {senhaGuardada ? (
+                    <div className="flex items-center gap-2">
+                      {senhaVisivel === u.id ? (
+                        <>
+                          <code className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-lg text-xs font-bold tracking-wider">
+                            {senhaGuardada}
+                          </code>
+                          <button
+                            onClick={() => { removerSenhaProvisora(u.id!); setSenhasProvisoras(getSenhasProvisoras()); setSenhaVisivel(null); }}
+                            title="Marcar como anotada"
+                            className="text-[10px] font-bold text-gray-400 hover:text-red-500 transition-colors px-1"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setSenhaVisivel(u.id!)}
+                          className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-bold text-[10px] uppercase tracking-wider py-1.5 px-3 rounded-xl transition-all"
+                        >
+                          🔑 Ver senha
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-gray-300 text-[10px] font-bold">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex gap-2">
+                    <button onClick={() => onEdit(u)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95 border border-blue-100">Editar</button>
+                    <button onClick={() => onDelete(u)} className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95 border border-red-100">Excluir</button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

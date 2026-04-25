@@ -121,13 +121,50 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const textData = await res.text();
-    let errorData = null;
+    let errorData: any = null;
     try {
       errorData = textData ? JSON.parse(textData) : null;
     } catch {
       errorData = { message: textData };
     }
-    const errorMessage = errorData?.message ?? errorData?.mensagem ?? `Erro ${res.status}`;
+
+    // Extrai mensagem amigável de diferentes formatos do Spring Boot:
+    // 1. MethodArgumentNotValidException -> fieldErrors: [{field, message}]
+    // 2. BindException -> errors: [{defaultMessage}]
+    // 3. ResponseStatusException -> message
+    // 4. Problem Details (RFC 7807) -> title + detail
+    let errorMessage: string;
+    if (Array.isArray(errorData?.fieldErrors) && errorData.fieldErrors.length > 0) {
+      errorMessage = errorData.fieldErrors
+        .map((e: any) => e.message || e.defaultMessage)
+        .filter(Boolean)
+        .join(", ");
+    } else if (Array.isArray(errorData?.errors) && errorData.errors.length > 0) {
+      errorMessage = errorData.errors
+        .map((e: any) => e.defaultMessage || e.message || e)
+        .filter(Boolean)
+        .join(", ");
+    } else if (errorData?.detail && errorData?.title) {
+      // Problem Details format (Spring Boot 3+)
+      errorMessage = errorData.detail !== "Invalid request content."
+        ? errorData.detail
+        : errorData.title;
+    } else if (
+      errorData &&
+      typeof errorData === "object" &&
+      !errorData.message &&
+      !errorData.error &&
+      !errorData.status
+    ) {
+      // Formato plano { campo: "mensagem" } ex: { cpf: "CPF inválido" }
+      const msgs = Object.values(errorData).filter((v) => typeof v === "string");
+      errorMessage = msgs.length > 0
+        ? (msgs as string[]).join(", ")
+        : `Erro ${res.status}`;
+    } else {
+      errorMessage = errorData?.message ?? errorData?.mensagem ?? errorData?.error ?? errorData?.title ?? `Erro ${res.status}`;
+    }
+
     const err: any = new Error(errorMessage);
     err.response = { status: res.status, data: errorData };
     throw err;
