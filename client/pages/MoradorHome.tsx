@@ -12,6 +12,7 @@ import {
   uploadFotoPerfil,
   alterarSenha,
   clearSession,
+  BASE_URL
 } from "@/services/api";
 import { Users, Clock, Calendar, Menu, X, LogOut, Settings, User, Camera, Lock, ChevronLeft } from "lucide-react";
 import type { UsuarioDTOResponse, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
@@ -221,6 +222,8 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
     </button>
   );
 
+  const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="flex flex-col items-center gap-2">
@@ -249,7 +252,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
             
             <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg mb-4 bg-white group">
               <img 
-                src={usuarioLogado?.foto || "/icone.png"} 
+                src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"} 
                 className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${uploadingFoto ? 'opacity-30' : ''}`} 
                 alt="Perfil" 
               />
@@ -339,7 +342,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 <div key={local.id} className="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:border-accent/30 transition-all duration-300 flex flex-col">
                   <div className="relative h-48 overflow-hidden bg-gray-100">
                     <img 
-                      src={local.fotoUrl || "/icone.png"} 
+                      src={local.fotoUrl ? (local.fotoUrl.startsWith('http') ? local.fotoUrl : `${BASE_URL}${local.fotoUrl}`) : "/icone.png"} 
                       alt={local.nome} 
                       className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!local.fotoUrl && "p-12 opacity-20"}`}
                     />
@@ -455,19 +458,23 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex justify-end gap-2">
-                              <button onClick={() => prepararEdicao(res)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                                <span className="text-xs font-bold">Editar</span>
-                              </button>
-                              <button 
-                                onClick={() => { 
-                                  setSelectedReservaForCancel(res);
-                                  setShowCancelModal(true);
-                                }} 
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Cancelar"
-                              >
-                                <span className="text-xs font-bold">Cancelar</span>
-                              </button>
+                              {(res.status !== "CANCELADA" && (!res.data || res.data >= hojeString)) && (
+                                <>
+                                  <button onClick={() => prepararEdicao(res)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-50" title="Editar">
+                                    <span className="text-xs font-bold uppercase tracking-wider">Editar</span>
+                                  </button>
+                                  <button 
+                                    onClick={() => { 
+                                      setSelectedReservaForCancel(res);
+                                      setShowCancelModal(true);
+                                    }} 
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-50"
+                                    title="Cancelar"
+                                  >
+                                    <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -487,7 +494,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
               <div className="flex flex-col items-center gap-4">
                 <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white flex-shrink-0 group">
                   <img 
-                    src={usuarioLogado?.foto || "/icone.png"} 
+                    src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"} 
                     className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`} 
                     alt="Perfil" 
                   />

@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+export const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 import type {
   UsuarioDTO,
   UsuarioDTOResponse,
@@ -100,9 +100,10 @@ async function attemptRefresh(): Promise<string | null> {
 
 async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
   let token = getToken();
+  const isAuthRoute = path.includes("/auth/login") || path.includes("/auth/primeiro-acesso");
   let headers: Record<string, string> = {
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...((token && !isAuthRoute) ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string> ?? {}),
   };
 

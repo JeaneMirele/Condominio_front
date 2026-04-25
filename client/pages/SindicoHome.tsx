@@ -17,6 +17,8 @@ import {
   getMeuPerfil,
   clearSession,
   uploadFotoPerfil,
+  alterarSenha,
+  BASE_URL
 } from "@/services/api";
 import type { UsuarioDTOResponse, LocalDTO, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar } from "lucide-react";
@@ -90,6 +92,7 @@ export default function OwnerHome() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
 
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -103,6 +106,17 @@ export default function OwnerHome() {
     carregarTudo();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === "perfil" && usuarioLogado) {
+      setEditProfileForm({
+        nome: usuarioLogado.nome || "",
+        email: usuarioLogado.email || "",
+        telefone: usuarioLogado.telefone || ""
+      });
+      setFormError("");
+    }
+  }, [activeTab, usuarioLogado]);
+
   async function carregarTudo() {
     setLoading(true);
     try {
@@ -114,8 +128,8 @@ export default function OwnerHome() {
       ]);
 
       setUsuarioLogado(perfil);
-      setGerentes(usuarios.filter((u) => u.roles?.some((r) => r.toUpperCase() === "GERENTE")));
-      setSindicos(usuarios.filter((u) => u.roles?.some((r) => r.toUpperCase() === "SINDICO")));
+      setGerentes(usuarios.filter((u) => u.roles?.some((r) => r.toUpperCase().includes("GERENTE"))));
+      setSindicos(usuarios.filter((u) => u.roles?.some((r) => r.toUpperCase().includes("SINDICO"))));
       setLocais(locaisList);
       setReservas(reservasList);
     } catch (err) {
@@ -148,31 +162,37 @@ export default function OwnerHome() {
       setFormError("Preencha nome, email e CPF.");
       return;
     }
+
+
     try {
+      // Garantir que não estamos em modo edição
       const resp = await criarUsuario({
         nome: userFormData.nome,
         email: userFormData.email,
         cpf: userFormData.cpf,
-        telefone: userFormData.telefone || null,
+        telefone: userFormData.telefone,
         roles: [addingRole],
       });
       setSenhaGerada(resp.senha ?? "");
       await carregarTudo();
       toast.success(`${addingRole === "GERENTE" ? "Gerente" : "Síndico"} criado com sucesso!`);
     } catch (err: any) {
-      setFormError(err.message ?? "Erro ao salvar no banco.");
+      setFormError(err.message ?? "Erro ao salvar no banco. Verifique se o e-mail ou CPF já existem.");
     }
   }
 
   async function handleEditUser() {
     if (!selectedUser) return;
     setFormError("");
+    const cleanCpf = userFormData.cpf.replace(/\D/g, "");
+    const cleanTelefone = userFormData.telefone.replace(/\D/g, "");
+
     try {
       await atualizarUsuario(selectedUser.id, {
         nome: userFormData.nome,
         email: userFormData.email,
-        cpf: userFormData.cpf,
-        telefone: userFormData.telefone || null,
+        cpf: cleanCpf,
+        telefone: cleanTelefone || null,
         roles: selectedUser.roles,
       });
       setShowEditUserModal(false);
@@ -301,11 +321,10 @@ export default function OwnerHome() {
   const NavItem = ({ id, label, icon: Icon }: { id: ActiveTab, label: string, icon: any }) => (
     <button
       onClick={() => { setActiveTab(id); setShowSidebar(false); }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-        activeTab === id 
-        ? "bg-accent text-white shadow-lg shadow-accent/20 font-bold" 
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === id
+        ? "bg-accent text-white shadow-lg shadow-accent/20 font-bold"
         : "text-gray-500 hover:bg-gray-100 font-medium"
-      }`}
+        }`}
     >
       <Icon className="w-5 h-5" />
       <span>{label}</span>
@@ -340,11 +359,14 @@ export default function OwnerHome() {
 
       // 3. Atualizar Senha se necessário
       if (trocandoSenha) {
-        // Nota: No original SindicoHome, o handle pedia senha atual? 
-        // Olhando o código anterior, handleChangePassword não usava senha atual.
-        // Vamos manter a compatibilidade com a API de AlterarSenha que pede a atual.
-        // Se o usuário não forneceu a atual (porque não tem campo), isso pode falhar.
-        // Vou adicionar o campo de senha atual para consistência.
+        if (!currentPassword) throw new Error("Informe a senha atual para prosseguir.");
+        await alterarSenha({
+          senhaAtual: currentPassword,
+          novaSenha: newPassword
+        });
+        setCurrentPassword("");
+        setNewPassword("");
+        confirmPassword !== "" && setConfirmPassword("");
       }
 
       toast.success("Perfil e configurações atualizados!");
@@ -424,21 +446,21 @@ export default function OwnerHome() {
             <button onClick={() => setShowSidebar(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors">
               <X className="w-6 h-6" />
             </button>
-            
+
             <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg mb-4 bg-white group">
-              <img 
-                src={usuarioLogado?.foto || "/icone.png"} 
-                className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${uploadingFoto ? 'opacity-30' : ''}`} 
-                alt="Perfil" 
+              <img
+                src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"}
+                className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${uploadingFoto ? 'opacity-30' : ''}`}
+                alt="Perfil"
               />
-              <button 
+              <button
                 onClick={() => { setActiveTab("perfil"); setShowSidebar(false); }}
                 className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <Camera className="w-6 h-6 text-white" />
               </button>
             </div>
-            
+
             <h3 className="font-bold text-gray-900 text-lg mb-0.5">{usuarioLogado?.nome}</h3>
             <p className="text-[10px] font-bold text-accent uppercase">{usuarioLogado?.roles?.[0] || 'Síndico'}</p>
           </div>
@@ -450,7 +472,7 @@ export default function OwnerHome() {
 
           {/* Drawer Footer */}
           <div className="p-4 border-t border-gray-100 mt-auto">
-            <button 
+            <button
               onClick={handleSignOut}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 font-bold transition-all"
             >
@@ -477,9 +499,9 @@ export default function OwnerHome() {
               </h1>
             </div>
 
-              <div className="flex items-center gap-2 sm:gap-3">
-                {/* Somente botões globais se necessário, mas o usuário pediu para remover Novo Gerente */}
-              </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Somente botões globais se necessário, mas o usuário pediu para remover Novo Gerente */}
+            </div>
           </div>
         </div>
       </header>
@@ -499,9 +521,8 @@ export default function OwnerHome() {
             };
             return (
               <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-6 py-4 font-bold text-sm border-b-2 transition-all whitespace-nowrap ${
-                  activeTab === tab ? "border-accent text-accent" : "border-transparent text-gray-400 hover:text-gray-600"
-                }`}
+                className={`px-6 py-4 font-bold text-sm border-b-2 transition-all whitespace-nowrap ${activeTab === tab ? "border-accent text-accent" : "border-transparent text-gray-400 hover:text-gray-600"
+                  }`}
               >
                 {labels[tab]}
               </button>
@@ -530,7 +551,7 @@ export default function OwnerHome() {
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
+
               {/* STATUS GRÁFICO (PIE) */}
               <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Status das Reservas</h3>
@@ -563,9 +584,9 @@ export default function OwnerHome() {
                             ))
                           }
                         </Pie>
-                        <Tooltip 
-                          contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}}
-                          formatter={(value: number) => [`${value} Reservas`, 'Quantidade']} 
+                        <Tooltip
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                          formatter={(value: number) => [`${value} Reservas`, 'Quantidade']}
                         />
                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                       </PieChart>
@@ -591,9 +612,9 @@ export default function OwnerHome() {
                         margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                        <XAxis dataKey="name" tick={{fontSize: 10, fill: '#9CA3AF', fontWeight: 600}} axisLine={false} tickLine={false} />
-                        <YAxis allowDecimals={false} tick={{fontSize: 10, fill: '#9CA3AF', fontWeight: 600}} axisLine={false} tickLine={false} />
-                        <Tooltip cursor={{fill: '#F9FAFB'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                        <Tooltip cursor={{ fill: '#F9FAFB' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
                         <Bar dataKey="Quantidade" fill="#6366f1" radius={[8, 8, 0, 0]} barSize={32} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -606,13 +627,51 @@ export default function OwnerHome() {
         )}
 
         {activeTab === "managers" && (
-          <TabelaUsuarios usuarios={gerentes} onEdit={abrirEditUser}
-            onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900">Gestão de Gerentes</h2>
+              <button
+                onClick={() => {
+                  setAddingRole("GERENTE");
+                  setSelectedUser(null);
+                  setUserFormData({ nome: "", email: "", cpf: "", telefone: "" });
+                  setFormError("");
+                  setShowEditUserModal(false);
+                  setShowAddUserModal(true);
+                }}
+                className="bg-accent hover:bg-accent/90 text-white font-bold text-xs py-3 px-6 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Users className="w-4 h-4" />
+                Cadastrar Gerente
+              </button>
+            </div>
+            <TabelaUsuarios usuarios={gerentes} onEdit={abrirEditUser}
+              onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
+          </div>
         )}
 
         {activeTab === "syndics" && (
-          <TabelaUsuarios usuarios={sindicos} onEdit={abrirEditUser}
-            onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900">Gestão de Síndicos</h2>
+              <button
+                onClick={() => {
+                  setAddingRole("SINDICO");
+                  setSelectedUser(null);
+                  setUserFormData({ nome: "", email: "", cpf: "", telefone: "" });
+                  setFormError("");
+                  setShowEditUserModal(false);
+                  setShowAddUserModal(true);
+                }}
+                className="bg-accent hover:bg-accent/90 text-white font-bold text-xs py-3 px-6 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <ShieldAlert className="w-4 h-4" />
+                Cadastrar Síndico
+              </button>
+            </div>
+            <TabelaUsuarios usuarios={sindicos} onEdit={abrirEditUser}
+              onDelete={(u) => { setSelectedUser(u); setShowDeleteUserModal(true); }} />
+          </div>
         )}
 
         {activeTab === "reservations" && (
@@ -643,11 +702,13 @@ export default function OwnerHome() {
                           {r.status}
                         </span>
                       </td>
-                      <td className="px-4 py-4">
-                        <button onClick={() => { setSelectedReserva(r); setShowDeleteReservaModal(true); }}
-                          className="bg-red-50 hover:bg-red-100 text-red-700 font-medium text-xs py-1.5 px-3 rounded transition-colors">
-                          Cancelar
-                        </button>
+                      <td className="px-4 py-4 min-w-[120px]">
+                        {r.status !== 'CANCELADA' && (
+                          <button onClick={() => { setSelectedReserva(r); setShowDeleteReservaModal(true); }}
+                            className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95">
+                            Cancelar
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -675,8 +736,8 @@ export default function OwnerHome() {
                   </div>
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="flex justify-between items-start mb-2">
-                       <h3 className="font-bold text-gray-900 text-lg">{l.nome}</h3>
-                       <span className="bg-accent/10 text-accent text-xs font-bold px-3 py-1.5 rounded-xl uppercase tracking-wider">R$ {l.taxaReserva?.toFixed(2)}</span>
+                      <h3 className="font-bold text-gray-900 text-lg">{l.nome}</h3>
+                      <span className="bg-accent/10 text-accent text-xs font-bold px-3 py-1.5 rounded-xl uppercase tracking-wider">R$ {l.taxaReserva?.toFixed(2)}</span>
                     </div>
                     <p className="text-sm text-gray-500 mb-3">{l.localizacao}</p>
                     <div className="space-y-2 mb-4 flex-1 mt-2">
@@ -685,7 +746,7 @@ export default function OwnerHome() {
                         <span className="font-medium">Capacidade</span>
                         <span className="text-gray-900 font-bold ml-auto">{l.capacidade} <span className="font-normal text-xs text-gray-500">pessoas</span></span>
                       </div>
-                      
+
                       <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100">
                         <Clock className="w-4 h-4 text-accent" />
                         <span className="font-medium">Disponibilidade</span>
@@ -787,10 +848,10 @@ export default function OwnerHome() {
           <div className="flex justify-center mb-16 border-b border-gray-100 pb-12">
             <div className="flex flex-col items-center gap-4">
               <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white flex-shrink-0 group">
-                <img 
-                  src={usuarioLogado?.foto || "/icone.png"} 
-                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`} 
-                  alt="Perfil" 
+                <img
+                  src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"}
+                  className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`}
+                  alt="Perfil"
                 />
                 {uploadingFoto && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-sm">
@@ -828,7 +889,11 @@ export default function OwnerHome() {
             </section>
 
             <section className="space-y-8 text-left">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-600 uppercase ml-1">Senha Atual</label>
+                  <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                </div>
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nova Senha</label>
                   <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
@@ -843,14 +908,14 @@ export default function OwnerHome() {
 
             <div className="pt-8 flex flex-col sm:flex-row items-center justify-end gap-4 sm:gap-6 pb-12">
               {formError && <p className="text-xs text-red-500 font-bold">{formError}</p>}
-              <button 
+              <button
                 onClick={() => setActiveTab("managers")}
                 className="w-full sm:w-auto px-8 py-5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-xs font-bold uppercase hover:bg-gray-50 hover:text-accent hover:border-accent transition-all active:scale-95"
               >
                 Voltar
               </button>
-              <button 
-                onClick={handleSalvarPerfil} 
+              <button
+                onClick={handleSalvarPerfil}
                 disabled={savingProfile}
                 className="w-full sm:w-auto px-12 py-5 bg-accent text-white rounded-2xl text-sm font-bold uppercase hover:bg-accent/90 transition-all shadow-xl shadow-accent/20 active:scale-95 disabled:opacity-50"
               >
@@ -870,7 +935,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100] animate-in fade-in duration-300">
       <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-300 relative">
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
         >
@@ -908,8 +973,8 @@ function TabelaUsuarios({ usuarios, onEdit, onDelete }: {
               <td className="px-4 py-4 text-sm text-gray-600">{u.telefone ?? "—"}</td>
               <td className="px-4 py-4">
                 <div className="flex gap-2">
-                  <button onClick={() => onEdit(u)} className="bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium text-xs py-1.5 px-3 rounded transition-colors">Editar</button>
-                  <button onClick={() => onDelete(u)} className="bg-red-50 hover:bg-red-100 text-red-700 font-medium text-xs py-1.5 px-3 rounded transition-colors">Remover</button>
+                  <button onClick={() => onEdit(u)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95 border border-blue-100">Editar</button>
+                  <button onClick={() => onDelete(u)} className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95 border border-red-100">Excluir</button>
                 </div>
               </td>
             </tr>
@@ -960,7 +1025,7 @@ function FormLocal({ data, onChange, error, onCancel, onSubmit, submitLabel }: {
   onSubmit: () => void;
   submitLabel: string;
 }) {
-  const TIME_SLOTS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"];
+  const TIME_SLOTS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
   return (
     <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
       <div>

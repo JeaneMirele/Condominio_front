@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { login, primeiroAcesso, trocarRoleAtiva } from "@/services/api";
+import { Eye, EyeOff } from "lucide-react";
 
 const ROLE_CONFIG: Record<string, { label: string; icon: JSX.Element; route: string; description: string }> = {
   SINDICO: {
@@ -44,6 +45,7 @@ export default function LoginForm() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -65,13 +67,16 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      if (!email || !password) {
+      const emailTrimmed = email.trim();
+      const passwordTrimmed = password.trim();
+
+      if (!emailTrimmed || !passwordTrimmed) {
         setError("Por favor preencha todos os campos");
         setIsLoading(false);
         return;
       }
 
-      const { roles } = await login(email, password);
+      const { roles } = await login(emailTrimmed, passwordTrimmed);
 
       if (roles.length > 1) {
         setRolesDisponiveis(roles);
@@ -103,11 +108,14 @@ export default function LoginForm() {
       return;
     }
 
+    const emailTrimmed = email.trim();
+    const passwordTrimmed = password.trim();
+
     setIsLoading(true);
     try {
-      await primeiroAcesso(email, password, novaSenha);
+      await primeiroAcesso(emailTrimmed, passwordTrimmed, novaSenha);
       
-      const { roles } = await login(email, novaSenha);
+      const { roles } = await login(emailTrimmed, novaSenha);
       if (roles.length > 1) {
         setRolesDisponiveis(roles);
         setPrecisaTrocar(false);
@@ -308,12 +316,21 @@ export default function LoginForm() {
                 <label htmlFor="password" className="block text-xs font-semibold text-gray-700 mb-2 sm:text-sm">
                   Senha
                 </label>
-                <input
-                  id="password" type="password" placeholder="••••••••"
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  className="w-full px-3 py-3 sm:px-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent focus:bg-white transition-all disabled:opacity-50 text-sm sm:text-base"
-                />
+                <div className="relative">
+                  <input
+                    id="password" type={showPassword ? "text" : "password"} placeholder="••••••••"
+                    value={password} onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    className="w-full px-3 py-3 sm:px-4 pr-10 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent focus:bg-white transition-all disabled:opacity-50 text-sm sm:text-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
