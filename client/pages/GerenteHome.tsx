@@ -267,11 +267,23 @@ export default function ManagerHome() {
   async function handleDeleteUnidade() {
     if (!selectedUnidade?.id) return;
     try {
-      await deletarUnidade(selectedUnidade.id);
+      const idToDelete = selectedUnidade.id;
+      const moradoresNaUnidade = moradores.filter(m => m.unidade?.id === idToDelete);
+
+      if (moradoresNaUnidade.length > 0) {
+        await Promise.all(moradoresNaUnidade.map(m =>
+          atualizarUsuario(m.id, {
+            nome: m.nome || "", email: m.email || "", cpf: m.cpf, telefone: m.telefone,
+            id_unidade: undefined as any, roles: m.roles || ["MORADOR"]
+          })
+        ));
+      }
+
+      await deletarUnidade(idToDelete);
       toast.success("Unidade removida com sucesso.");
       setShowDeleteUnitModal(false);
       setSelectedUnidade(null);
-      carregarTudo();
+      await carregarTudo();
     } catch (err: any) {
       toast.error(err.message || "Falha ao deletar unidade.");
     }
@@ -309,7 +321,7 @@ export default function ManagerHome() {
       });
 
       setSenhaGerada(resp.senha ?? "");
-      carregarTudo();
+      await carregarTudo();
     } catch (err: any) {
       setActionError(err.message || "Erro ao cadastrar Morador.");
     }
@@ -343,9 +355,23 @@ export default function ManagerHome() {
         id_unidade: tIdUnidade,
         roles: ["MORADOR"]
       });
+      // Atualização otimista para feedback instantâneo nas tabelas
+      setMoradores(prev => prev.map(m =>
+        m.id === selectedResident.id
+          ? {
+            ...m,
+            nome: residentFormData.nome,
+            email: residentFormData.email,
+            cpf: cleanCpf,
+            telefone: cleanTelefone,
+            unidade: unidades.find(u => u.id === tIdUnidade)
+          }
+          : m
+      ));
+
       toast.success("Morador atualizado.");
       setShowEditResidentModal(false);
-      carregarTudo();
+      await carregarTudo();
     } catch (err: any) {
       setActionError(err.message || "Falha ao editar morador.");
     }
@@ -357,7 +383,8 @@ export default function ManagerHome() {
       await deletarUsuario(selectedResident.id);
       toast.success("Morador deletado permanentemente.");
       setShowDeleteResidentModal(false);
-      carregarTudo();
+      setSelectedResident(null);
+      await carregarTudo();
     } catch (err: any) {
       toast.error(err.message || "Falha ao excluir.");
     }
@@ -645,18 +672,7 @@ export default function ManagerHome() {
                   <Users className="w-8 h-8 text-accent" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Unidade Vazia</h3>
-                <p className="text-gray-500 text-sm mb-8 max-w-xs mx-auto">Esta unidade ainda não possui moradores vinculados.</p>
-                <button
-                  onClick={() => {
-                    setResidentFormData({ nome: "", email: "", cpf: "", telefone: "", id_unidade: selectedUnidade.id!.toString() });
-                    setActionError("");
-                    setShowAddResidentModal(true);
-                  }}
-                  className="bg-accent text-white font-bold text-sm px-8 py-4 rounded-2xl shadow-lg shadow-accent/20 hover:bg-accent/90 transition-all active:scale-95 inline-flex items-center gap-2"
-                >
-                  <Users className="w-4 h-4" />
-                  Vincular Morador
-                </button>
+                <p className="text-gray-500 text-sm mb-8 max-w-xs mx-auto">Esta unidade ainda não possui moradores vinculados. Cadastre um morador através da aba Moradores.</p>
               </div>
             ) : (
               <>
@@ -680,8 +696,7 @@ export default function ManagerHome() {
                     <thead>
                       <tr className="bg-gray-50/50">
                         <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Perfil Registrado</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Contato / Credenciais</th>
-                        <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Definições</th>
+                        <th className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Email/Telefone</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -705,51 +720,10 @@ export default function ManagerHome() {
                               </p>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => {
-                                  setSelectedResident(resident);
-                                  setResidentFormData({
-                                    nome: resident.nome!, email: resident.email!, cpf: resident.cpf || "", telefone: resident.telefone || "", id_unidade: resident.unidade?.id?.toString() || ""
-                                  });
-                                  setActionError("");
-                                  setShowEditResidentModal(true);
-                                }}
-                                className="bg-white border border-gray-200 hover:border-blue-400 text-blue-600 font-bold text-xs py-2 px-4 rounded transition-all"
-                              >
-                                Alterar
-                              </button>
-                              <button
-                                onClick={() => { setSelectedResident(resident); setShowDeleteResidentModal(true); }}
-                                className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs py-2 px-4 rounded transition-colors border border-red-100"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-
-                  {/* Footer Adicionar caso < 2 */}
-                  <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                    {getMoradoresPorUnidade(selectedUnidade.id!).length < 2 ? (
-                      <button
-                        onClick={() => {
-                          setResidentFormData({ nome: "", email: "", cpf: "", telefone: "", id_unidade: selectedUnidade.id!.toString() });
-                          setActionError("");
-                          setShowAddResidentModal(true);
-                        }}
-                        className="w-full text-center border-2 border-dashed border-gray-200 hover:border-accent text-gray-400 hover:text-accent font-bold text-[10px] uppercase tracking-widest py-4 rounded-2xl transition-all cursor-pointer bg-gray-50/30"
-                      >
-                        Vincular Morador
-                      </button>
-                    ) : (
-                      <p className="w-full text-center text-xs font-bold text-gray-400 uppercase tracking-widest py-3">Lotação Máxima Atingida (2/2)</p>
-                    )}
-                  </div>
                 </div>
               </>
             )}
@@ -987,7 +961,7 @@ export default function ManagerHome() {
                           <input type="text" value={residentFormData.telefone} onChange={(e) => setResidentFormData({ ...residentFormData, telefone: e.target.value })} placeholder="(00) 00000-0000" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
                         </div>
 
-                        {activeTab === 'residents' && !showEditResidentModal && (
+                        {activeTab === 'residents' && (
                           <div className="pt-2">
                             <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide border-t border-gray-100 pt-4">Vincular à Unidade</label>
                             <select
@@ -1020,69 +994,6 @@ export default function ManagerHome() {
                       </div>
                     </div>
                   )}
-
-                  {/* SELEÇÃO DE MORADOR EXISTENTE: Apenas na aba Unidades */}
-                  {showAddResidentModal && activeTab === 'units' && (
-                    <div className="space-y-6">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
-                        Selecione o Morador
-                      </h4>
-
-                      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                        {moradores.length === 0 ? (
-                          <div className="py-10 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-xs text-gray-400 italic">
-                            Nenhum morador no sistema.
-                          </div>
-                        ) : (
-                          moradores
-                            .filter(m => !m.unidade)
-                            .map((m) => (
-                              <div key={m.id} className="group flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-2xl hover:border-accent hover:bg-white transition-all">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-xs">
-                                    {m.nome?.charAt(0)}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-bold text-gray-900 truncate">{m.nome}</p>
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    const targetId = selectedUnidade?.id || parseInt(residentFormData.id_unidade);
-                                    if (!targetId) {
-                                      toast.error("Unidade não identificada.");
-                                      return;
-                                    }
-
-                                    (async () => {
-                                      try {
-                                        await atualizarUsuario(m.id, {
-                                          nome: m.nome || "",
-                                          email: m.email || "",
-                                          cpf: m.cpf,
-                                          telefone: m.telefone,
-                                          endereco: m.endereco,
-                                          id_unidade: targetId,
-                                          roles: m.roles || ["MORADOR"]
-                                        });
-                                        toast.success("Morador vinculado com sucesso!");
-                                        setShowAddResidentModal(false);
-                                        carregarTudo();
-                                      } catch (err: any) {
-                                        toast.error(err.message || "Erro ao vincular.");
-                                      }
-                                    })();
-                                  }}
-                                  className="px-4 py-2 bg-accent text-white rounded-xl text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-all shadow-md shadow-accent/10"
-                                >
-                                  Vincular
-                                </button>
-                              </div>
-                            ))
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1102,49 +1013,6 @@ export default function ManagerHome() {
             <div className="flex gap-4">
               <button onClick={() => setShowDeleteResidentModal(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl transition-all">Cancelar</button>
               <button onClick={handleDeleteResident} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-red-200 transition-all active:scale-95">Confirmar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirm Move MORADOR */}
-      {showConfirmMoveModal && residentToMove && selectedUnidade && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl border border-gray-100 animate-in zoom-in-95 duration-300 text-center">
-            <div className="w-16 h-16 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <ShieldAlert className="w-8 h-8" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">Mover Morador?</h3>
-            <p className="text-sm text-gray-500 mb-8 leading-relaxed">
-              <b>{residentToMove.nome}</b> já está vinculado à unidade <b>B{residentToMove.unidade?.bloco} - A{residentToMove.unidade?.apartamento}</b>.
-              Deseja removê-lo de lá e transferi-lo para esta unidade (<b>B{selectedUnidade.bloco} - A{selectedUnidade.apartamento}</b>)?
-            </p>
-            <div className="flex gap-4">
-              <button onClick={() => { setShowConfirmMoveModal(false); setResidentToMove(null); }} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl transition-all">Cancelar</button>
-              <button
-                onClick={async () => {
-                  try {
-                    await atualizarUsuario(residentToMove.id, {
-                      nome: residentToMove.nome || "",
-                      email: residentToMove.email || "",
-                      cpf: residentToMove.cpf,
-                      telefone: residentToMove.telefone,
-                      endereco: residentToMove.endereco,
-                      id_unidade: selectedUnidade.id!,
-                      roles: residentToMove.roles || ["MORADOR"]
-                    });
-                    toast.success("Morador transferido com sucesso!");
-                    setShowConfirmMoveModal(false);
-                    setResidentToMove(null);
-                    carregarTudo();
-                  } catch (err: any) {
-                    toast.error(err.message || "Erro ao transferir.");
-                  }
-                }}
-                className="flex-[1.5] bg-accent hover:bg-accent/90 text-white font-bold py-4 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95"
-              >
-                Sim, Transferir
-              </button>
             </div>
           </div>
         </div>
