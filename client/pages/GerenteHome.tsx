@@ -961,22 +961,6 @@ export default function ManagerHome() {
                           <input type="text" value={residentFormData.telefone} onChange={(e) => setResidentFormData({ ...residentFormData, telefone: e.target.value })} placeholder="(00) 00000-0000" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
                         </div>
 
-                        {activeTab === 'residents' && (
-                          <div className="pt-2">
-                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide border-t border-gray-100 pt-4">Vincular à Unidade</label>
-                            <select
-                              value={residentFormData.id_unidade}
-                              onChange={(e) => setResidentFormData({ ...residentFormData, id_unidade: e.target.value })}
-                              className="w-full px-5 py-4 bg-orange-50/50 border border-orange-100 rounded-2xl text-sm font-bold text-orange-900 focus:ring-4 focus:ring-orange-50 transition-all outline-none cursor-pointer"
-                            >
-                              <option value="">Selecione a Unidade</option>
-                              {unidades.map((u) => (
-                                <option key={u.id} value={u.id}>Bloco {u.bloco} - Apto {u.apartamento}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
                         {actionError && (
                           <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-xs text-red-700 font-bold">
                             {actionError}
