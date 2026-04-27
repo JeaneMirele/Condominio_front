@@ -641,10 +641,7 @@ export default function ManagerHome() {
           <div className="space-y-4 transition-all">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <button onClick={() => setSelectedUnidade(null)} className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-xs uppercase tracking-widest rounded-xl transition-all">
-                  &lt; Voltar
-                </button>
-                <h2 className="text-2xl font-bold text-gray-900">Bloco {selectedUnidade.bloco} - Apt {selectedUnidade.apartamento}</h2>
+                <h2 className="text-2xl font-bold text-gray-900"> Bloco {selectedUnidade.bloco} - Apt {selectedUnidade.apartamento}</h2>
               </div>
               <div className="flex gap-2">
                 <button
@@ -657,11 +654,14 @@ export default function ManagerHome() {
                 >
                   Editar Dados
                 </button>
-                <button
+                {/*<button
                   onClick={() => setShowDeleteUnitModal(true)}
                   className="px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
                 >
                   Deletar Unidade
+                </button>*/}
+                <button onClick={() => setSelectedUnidade(null)} className="px-6 py-3 bg-orange-100 hover:bg-orange-200 text-orange-600 font-bold text-xs uppercase tracking-widest rounded-xl transition-all">
+                  Voltar
                 </button>
               </div>
             </div>
