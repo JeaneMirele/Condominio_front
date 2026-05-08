@@ -956,9 +956,24 @@ export default function ManagerHome() {
                             <input type="text" value={residentFormData.cpf} onChange={(e) => setResidentFormData({ ...residentFormData, cpf: e.target.value })} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Telefone</label>
-                          <input type="text" value={residentFormData.telefone} onChange={(e) => setResidentFormData({ ...residentFormData, telefone: e.target.value })} placeholder="(00) 00000-0000" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Telefone</label>
+                            <input type="text" value={residentFormData.telefone} onChange={(e) => setResidentFormData({ ...residentFormData, telefone: e.target.value })} placeholder="(00) 00000-0000" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Unidade</label>
+                            <select 
+                              value={residentFormData.id_unidade} 
+                              onChange={(e) => setResidentFormData({ ...residentFormData, id_unidade: e.target.value })} 
+                              className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm"
+                            >
+                              <option value="">Selecione uma unidade</option>
+                              {unidades.map(u => (
+                                <option key={u.id} value={u.id}>Bloco {u.bloco} - Apt {u.apartamento}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
 
                         {actionError && (
