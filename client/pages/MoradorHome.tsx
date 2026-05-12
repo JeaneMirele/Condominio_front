@@ -12,6 +12,7 @@ import {
   uploadFotoPerfil,
   alterarSenha,
   clearSession,
+  getHorariosDoLocal,
   BASE_URL
 } from "@/services/api";
 import { Users, Clock, Calendar, Menu, X, LogOut, Settings, User, Camera, Lock, ChevronLeft } from "lucide-react";
@@ -25,6 +26,8 @@ export default function ResidentHome() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("locais");
   const [usuarioLogado, setUsuarioLogado] = useState<UsuarioDTOResponse | null>(null);
   const [reservas, setReservas] = useState<ReservaDTOResponse[]>([]);
+  const [todasReservas, setTodasReservas] = useState<ReservaDTOResponse[]>([]);
+  const [horariosOcupadosBackend, setHorariosOcupadosBackend] = useState<string[]>([]);
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showEditReservation, setShowEditReservation] = useState(false);
 
@@ -40,6 +43,7 @@ export default function ResidentHome() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedReservaForCancel, setSelectedReservaForCancel] = useState<ReservaDTOResponse | null>(null);
   const [filtroData, setFiltroData] = useState("");
+  const [mostrarReservasPassadas, setMostrarReservasPassadas] = useState(false);
 
   const [formData, setFormData] = useState({ facilityId: "", date: "", startTime: "", endTime: "" });
   const [editForm, setEditForm] = useState({ 
@@ -68,6 +72,36 @@ export default function ResidentHome() {
 
   useEffect(() => { carregarDados(); }, []);
 
+  useEffect(() => {
+    if (formData.facilityId && formData.date) {
+      getHorariosDoLocal(Number(formData.facilityId), formData.date)
+        .then(res => {
+          if (Array.isArray(res)) {
+            // O backend retorna List<Object[]> onde cada array tem [horaEntrada, horaSaida]
+            // Vamos extrair todas as horas de início para marcar como ocupadas no frontend
+            const ocupados: string[] = [];
+            res.forEach(item => {
+              if (Array.isArray(item) && typeof item[0] === 'string') {
+                const start = item[0].substring(0, 5);
+                const end = item[1].substring(0, 5);
+                
+                // Adiciona todas as horas entre início e fim (exclusivo no fim)
+                const hStart = parseInt(start.split(":")[0]);
+                const hEnd = parseInt(end.split(":")[0]);
+                for (let h = hStart; h < hEnd; h++) {
+                  ocupados.push(`${h.toString().padStart(2, '0')}:00`);
+                }
+              }
+            });
+            setHorariosOcupadosBackend(ocupados);
+          }
+        })
+        .catch(err => console.error("Erro ao buscar horários ocupados do backend:", err));
+    } else {
+      setHorariosOcupadosBackend([]);
+    }
+  }, [formData.facilityId, formData.date]);
+
   async function carregarDados() {
     try {
       const [perfil, resList, locList] = await Promise.all([getMeuPerfil(), getReservas(), getLocais()]);
@@ -80,6 +114,7 @@ export default function ResidentHome() {
         : [];
         
       setReservas(minhasReservas);
+      setTodasReservas(Array.isArray(resList) ? resList : []);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar dados.");
@@ -98,8 +133,6 @@ function prepararEdicao(res: ReservaDTOResponse) {
   });
   setShowEditReservation(true);
 }
-
-
 
 const handleUpdateReservation = async () => {
   if (!selectedReserva) return;
@@ -141,6 +174,85 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
     setUploadingFoto(false);
   }
 }
+
+  const getHorarios = () => {
+    if (!formData.facilityId) return [];
+    const local = locaisDB.find(l => l.id?.toString() === formData.facilityId);
+    if (!local) return [];
+    
+    const inicioStr = local.horarioInicio || "08:00";
+    const fimStr = local.horarioFim || "22:00";
+    
+    const startHour = parseInt(inicioStr.split(":")[0]);
+    const endHour = parseInt(fimStr.split(":")[0]);
+
+    const horarios = [];
+    for (let h = startHour; h <= endHour; h++) {
+      horarios.push(`${h.toString().padStart(2, '0')}:00`);
+    }
+    return horarios;
+  };
+
+  const getHorariosEntradaDisponiveis = () => {
+    const todosHorarios = getHorarios();
+    if (todosHorarios.length > 0) todosHorarios.pop(); 
+
+    if (!formData.date) return todosHorarios;
+
+    const reservasDoDia = todasReservas.filter(r => 
+      r.local?.id?.toString() === formData.facilityId &&
+      r.data === formData.date &&
+      r.status !== "CANCELADA" &&
+      (!showEditReservation || r.id !== selectedReserva?.id)
+    );
+
+    return todosHorarios.filter(horaStr => {
+      // 1. Verifica se está na lista de horários ocupados do backend (nova API)
+      if (horariosOcupadosBackend.includes(horaStr)) return false;
+
+      // 2. Fallback: Verifica com as reservas em cache
+      return !reservasDoDia.some(r => {
+        const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
+        const resEnd = (r.horaSaida || "23:59:59").substring(0, 5);
+        return horaStr >= resStart && horaStr < resEnd;
+      });
+    });
+  };
+
+  const getHorariosSaidaDisponiveis = (start = formData.startTime) => {
+    if (!start) return [];
+    const todosHorarios = getHorarios();
+    
+    const reservasDoDia = todasReservas.filter(r => 
+      r.local?.id?.toString() === formData.facilityId &&
+      r.data === formData.date &&
+      r.status !== "CANCELADA" &&
+      (!showEditReservation || r.id !== selectedReserva?.id)
+    );
+
+    // O máximo possível é o fechamento do local
+    let maxEnd = todosHorarios[todosHorarios.length - 1];
+    
+    // Verifica a próxima reserva para limitar o horário de saída
+    reservasDoDia.forEach(r => {
+      const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
+      if (resStart > start && resStart < maxEnd) {
+        maxEnd = resStart;
+      }
+    });
+
+    // Também verifica as ocupações do backend
+    horariosOcupadosBackend.forEach(horaStr => {
+      if (horaStr > start && horaStr < maxEnd) {
+        maxEnd = horaStr;
+      }
+    });
+
+    return todosHorarios.filter(horaStr => {
+      return horaStr > start && horaStr <= maxEnd;
+    });
+  };
+
   const handleMakeReservation = async () => {
     if (!formData.facilityId || !formData.date || !formData.startTime || !formData.endTime) {
       toast.error("Preencha todos os campos da reserva.");
@@ -402,8 +514,18 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
         {activeTab === "reservas" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Minhas Reservas ({reservas.filter(r => !filtroData || r.data === filtroData).length})</h2>
+              <h2 className="text-xl font-bold text-gray-900">Minhas Reservas</h2>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setMostrarReservasPassadas(!mostrarReservasPassadas)}
+                  className={`text-xs font-bold py-2 px-4 rounded-xl transition-all ${
+                    mostrarReservasPassadas 
+                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200" 
+                    : "bg-accent/10 text-accent hover:bg-accent/20"
+                  }`}
+                >
+                  {mostrarReservasPassadas ? "Ocultar Reservas Passadas" : "Mostrar Reservas Passadas"}
+                </button>
                 <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
                 <input 
                   type="date" 
@@ -417,26 +539,40 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
-                {reservas.filter(r => !filtroData || r.data === filtroData).length === 0 ? (
-                  <div className="p-20 text-center">
-                    <p className="text-gray-400 italic">Nenhuma reserva encontrada{filtroData ? ' para esta data' : ''}.</p>
-                    <button onClick={() => setActiveTab("locais")} className="mt-4 bg-accent hover:bg-accent/90 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors">
-                      Ver Locais Disponíveis
-                    </button>
-                  </div>
-                ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Local</th>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Data</th>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Horário</th>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {reservas.filter(r => !filtroData || r.data === filtroData).map((res) => (
+                {(() => {
+                  const reservasFiltradas = reservas
+                    .filter(r => !filtroData || r.data === filtroData)
+                    .filter(r => mostrarReservasPassadas ? true : (r.data as string) >= hojeString)
+                    .sort((a, b) => {
+                      const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
+                      const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
+                      return dateA.getTime() - dateB.getTime();
+                    });
+
+                  if (reservasFiltradas.length === 0) {
+                    return (
+                      <div className="p-20 text-center">
+                        <p className="text-gray-400 italic">Nenhuma reserva encontrada{filtroData ? ' para esta data' : ''}.</p>
+                        <button onClick={() => setActiveTab("locais")} className="mt-4 bg-accent hover:bg-accent/90 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors">
+                          Ver Locais Disponíveis
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
+                          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Local</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Data</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Horário</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {reservasFiltradas.map((res) => (
                         <tr key={res.id} className="hover:bg-gray-50/50 transition-colors group">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="font-semibold text-gray-900 group-hover:text-accent transition-colors">{res.local?.nome}</div>
@@ -481,8 +617,9 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                       ))}
                     </tbody>
                   </table>
-                )}
-              </div>
+                );
+              })()}
+            </div>
             </div>
           </div>
         )}
@@ -665,24 +802,50 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Entrada</label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input 
-                      type="time" 
+                    <select 
                       value={formData.startTime} 
-                      onChange={e => setFormData({...formData, startTime: e.target.value})} 
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm" 
-                    />
+                      onChange={e => {
+                        const newStart = e.target.value;
+                        const saidas = getHorariosSaidaDisponiveis(newStart);
+                        // Se houver apenas uma saída, seleciona ela. 
+                        // Caso contrário, se o endTime atual não estiver mais na lista, limpa ele.
+                        let newEnd = formData.endTime;
+                        if (saidas.length === 1) {
+                          newEnd = saidas[0];
+                        } else if (!saidas.includes(formData.endTime)) {
+                          newEnd = "";
+                        }
+                        setFormData({...formData, startTime: newStart, endTime: newEnd});
+                      }} 
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none" 
+                    >
+                      <option value="" disabled>Selecione</option>
+                      {getHorariosEntradaDisponiveis().map(h => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    {formData.date && getHorariosEntradaDisponiveis().length === 0 && (
+                      <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-top-1 duration-300">
+                        <p className="text-[11px] text-red-600 font-bold text-center leading-tight">Não há horários disponíveis nessa data</p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Saída</label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input 
-                      type="time" 
+                    <select 
                       value={formData.endTime} 
                       onChange={e => setFormData({...formData, endTime: e.target.value})} 
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm" 
-                    />
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none" 
+                      disabled={!formData.startTime}
+                    >
+                      <option value="" disabled>Selecione</option>
+                      {getHorariosSaidaDisponiveis().map(h => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

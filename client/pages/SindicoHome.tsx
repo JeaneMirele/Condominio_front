@@ -85,6 +85,8 @@ export default function OwnerHome() {
   const [showDeleteReservaModal, setShowDeleteReservaModal] = useState(false);
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [mostrarReservasPassadas, setMostrarReservasPassadas] = useState(false);
+  const [filtroDataSindico, setFiltroDataSindico] = useState("");
 
   // ── Perfil ──
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -689,97 +691,154 @@ export default function OwnerHome() {
         )}
 
         {activeTab === "reservations" && (
-          <div className="overflow-x-auto">
-            {reservas.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva encontrada.</p>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    {["Morador", "Local", "Data", "Hora", "Status", "Ações"].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 sm:text-sm">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservas.map((r) => (
-                    <tr key={r.id} className="border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                        {r.morador?.nome}<br />
-                        <span className="text-gray-500 text-xs">{r.morador?.email}</span>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-700">{r.local?.nome}</td>
-                      <td className="px-4 py-4 text-sm text-gray-700">{formatarData(r.data)}</td>
-                      <td className="px-4 py-4 text-sm text-gray-700">{formatarHora(r.horaEntrada as string)}</td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${badgeStatus(r.status)}`}>
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 min-w-[120px]">
-                        {r.status !== 'CANCELADA' && (
-                          <button onClick={() => { setSelectedReserva(r); setShowDeleteReservaModal(true); }}
-                            className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95">
-                            Cancelar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div className="space-y-6">
+            <div className="flex flex-wrap justify-between items-center gap-3">
+              <h2 className="text-xl font-bold text-gray-900">Reservas</h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Filtrar por data:</label>
+                  <input
+                    type="date"
+                    value={filtroDataSindico}
+                    onChange={e => setFiltroDataSindico(e.target.value)}
+                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                  />
+                  {filtroDataSindico && (
+                    <button onClick={() => setFiltroDataSindico("")} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => setMostrarReservasPassadas(!mostrarReservasPassadas)}
+                  className={`text-xs font-bold py-2 px-4 rounded-xl transition-all ${mostrarReservasPassadas
+                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    : "bg-accent/10 text-accent hover:bg-accent/20"
+                  }`}
+                >
+                  {mostrarReservasPassadas ? "Ocultar Passadas" : "Mostrar Passadas"}
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              {(() => {
+                const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                const reservasFiltradas = reservas
+                  .filter(r => mostrarReservasPassadas ? true : (r.data as string) >= hojeString)
+                  .filter(r => !filtroDataSindico || r.data === filtroDataSindico)
+                  .sort((a, b) => {
+                    const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
+                    const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
+                    return dateA.getTime() - dateB.getTime();
+                  });
+
+                if (reservasFiltradas.length === 0) {
+                  return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva encontrada.</p>;
+                }
+
+                return (
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        {["Morador", "Local", "Data", "Hora", "Status", "Ações"].map((h) => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 sm:text-sm">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reservasFiltradas.map((r) => (
+                        <tr key={r.id} className="border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                            {r.morador?.nome}<br />
+                            <span className="text-gray-500 text-xs">{r.morador?.email}</span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-700">{r.local?.nome}</td>
+                          <td className="px-4 py-4 text-sm text-gray-700">{formatarData(r.data)}</td>
+                          <td className="px-4 py-4 text-sm text-gray-700 whitespace-nowrap">
+                            {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${badgeStatus(r.status)}`}>
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 min-w-[120px]">
+                            {r.status !== 'CANCELADA' && (r.data as string) >= hojeString && (
+                              <button onClick={() => { setSelectedReserva(r); setShowDeleteReservaModal(true); }}
+                                className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95">
+                                Cancelar
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
           </div>
         )}
 
         {activeTab === "areas" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {locais.length === 0 ? (
-              <div className="col-span-full bg-white rounded-2xl border border-gray-100 p-16 text-center">
-                <p className="text-gray-400 italic">Nenhuma área cadastrada.</p>
-                <button onClick={() => { setLocalFormData(emptyLocalForm); setFormError(""); setShowAddLocalModal(true); }} className="mt-4 bg-accent hover:bg-accent/90 text-white font-bold text-sm px-8 py-3 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95">
-                  Adicionar Lazer
-                </button>
-              </div>
-            ) : (
-              locais.map((l) => (
-                <div key={l.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:border-accent hover:shadow-md transition-all flex flex-col">
-                  <div className="w-full h-48 bg-gray-100 relative">
-                    {/* Fallback pattern to user defaults properly mapped in DB fotoUrl */}
-                    <img src={l.fotoUrl || "/icone.png"} alt={l.nome} className={`w-full h-full object-cover ${!l.fotoUrl && "p-6 opacity-30"}`} />
-                  </div>
-                  <div className="p-5 flex-1 flex flex-col">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-gray-900 text-lg">{l.nome}</h3>
-                      <span className="bg-accent/10 text-accent text-xs font-bold px-3 py-1.5 rounded-xl uppercase tracking-wider">R$ {l.taxaReserva?.toFixed(2)}</span>
-                    </div>
-                    <p className="text-sm text-gray-500 mb-3">{l.localizacao}</p>
-                    <div className="space-y-2 mb-4 flex-1 mt-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100">
-                        <Users className="w-4 h-4 text-accent" />
-                        <span className="font-medium">Capacidade</span>
-                        <span className="text-gray-900 font-bold ml-auto">{l.capacidade} <span className="font-normal text-xs text-gray-500">pessoas</span></span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100">
-                        <Clock className="w-4 h-4 text-accent" />
-                        <span className="font-medium">Disponibilidade</span>
-                        <span className="text-gray-900 font-bold ml-auto">{formatarHora(l.horarioInicio as string)} - {formatarHora(l.horarioFim as string)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-3 border-t border-gray-100 mt-auto">
-                      <button onClick={() => abrirEditLocal(l)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium text-xs py-2 rounded-lg transition-colors">
-                        Editar
-                      </button>
-                      <button onClick={() => { setSelectedLocal(l); setShowDeleteLocalModal(true); }} className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 font-medium text-xs py-2 rounded-lg transition-colors">
-                        Remover
-                      </button>
-                    </div>
-                  </div>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900">Áreas de Lazer</h2>
+              <button
+                onClick={() => { setLocalFormData(emptyLocalForm); setFormError(""); setShowAddLocalModal(true); }}
+                className="bg-accent hover:bg-accent/90 text-white font-bold text-xs py-3 px-6 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                Cadastrar Área de Lazer
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {locais.length === 0 ? (
+                <div className="col-span-full bg-white rounded-2xl border border-gray-100 p-16 text-center">
+                  <p className="text-gray-400 italic">Nenhuma área cadastrada.</p>
+                  <button onClick={() => { setLocalFormData(emptyLocalForm); setFormError(""); setShowAddLocalModal(true); }} className="mt-4 bg-accent hover:bg-accent/90 text-white font-bold text-sm px-8 py-3 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95">
+                    Adicionar Lazer
+                  </button>
                 </div>
-              ))
-            )}
+              ) : (
+                locais.map((l) => (
+                  <div key={l.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:border-accent hover:shadow-md transition-all flex flex-col">
+                    <div className="w-full h-48 bg-gray-100 relative">
+                      {/* Fallback pattern to user defaults properly mapped in DB fotoUrl */}
+                      <img src={l.fotoUrl || "/icone.png"} alt={l.nome} className={`w-full h-full object-cover ${!l.fotoUrl && "p-6 opacity-30"}`} />
+                    </div>
+                    <div className="p-5 flex-1 flex flex-col">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-gray-900 text-lg">{l.nome}</h3>
+                        <span className="bg-accent/10 text-accent text-xs font-bold px-3 py-1.5 rounded-xl uppercase tracking-wider">R$ {l.taxaReserva?.toFixed(2)}</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mb-3">{l.localizacao}</p>
+                      <div className="space-y-2 mb-4 flex-1 mt-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100">
+                          <Users className="w-4 h-4 text-accent" />
+                          <span className="font-medium">Capacidade</span>
+                          <span className="text-gray-900 font-bold ml-auto">{l.capacidade} <span className="font-normal text-xs text-gray-500">pessoas</span></span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100">
+                          <Clock className="w-4 h-4 text-accent" />
+                          <span className="font-medium">Disponibilidade</span>
+                          <span className="text-gray-900 font-bold ml-auto">{formatarHora(l.horarioInicio as string)} - {formatarHora(l.horarioFim as string)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-3 border-t border-gray-100 mt-auto">
+                        <button onClick={() => abrirEditLocal(l)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium text-xs py-2 rounded-lg transition-colors">
+                          Editar
+                        </button>
+                        <button onClick={() => { setSelectedLocal(l); setShowDeleteLocalModal(true); }} className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 font-medium text-xs py-2 rounded-lg transition-colors">
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 

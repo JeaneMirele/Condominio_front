@@ -319,6 +319,12 @@ export async function deletarReserva(id: number): Promise<ReservaDTOResponse> {
   return http<ReservaDTOResponse>(`/reservas/${id}`, { method: "DELETE" });
 }
 
+export async function getHorariosDoLocal(idLocal: number, data: string): Promise<any[]> {
+  // Ajuste o caminho base dependendo de qual Controller (ReservaController ou LocalController) você colocou o método.
+  // Assumindo que foi no ReservaController:
+  return http<any[]>(`/reservas/${idLocal}/${data}`);
+}
+
 // ─── Unidades ──────────────────────────────────────────────────────────────
 
 export async function getUnidades(): Promise<UnidadeDTOResponse[]> {
