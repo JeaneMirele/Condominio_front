@@ -1,6 +1,6 @@
 {
-    "buildCommand": "npm run build",
-    "outputDirectory": "dist",
+    "buildCommand": "npm install && npm run build:client",
+    "outputDirectory": "dist/spa",
     "rewrites": [
         {
             "source": "/(.*)",
