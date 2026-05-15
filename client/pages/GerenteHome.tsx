@@ -16,7 +16,7 @@ import {
   clearSession,
   BASE_URL
 } from "@/services/api";
-import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, Home, Building2, UserCheck, ShieldAlert } from "lucide-react";
+import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, Home, Building2, UserCheck, ShieldAlert, Eye, EyeOff } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -69,6 +69,9 @@ export default function ManagerHome() {
   const [editProfileForm, setEditProfileForm] = useState({ nome: "", email: "", telefone: "" });
   const [passwordForm, setPasswordForm] = useState({ atual: "", nova: "", confirmacao: "" });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [showAtual, setShowAtual] = useState(false);
+  const [showNova, setShowNova] = useState(false);
+  const [showConfirmacao, setShowConfirmacao] = useState(false);
 
   // Unidade
   const [unitFormData, setUnitFormData] = useState({ bloco: "", apartamento: "" });
@@ -158,7 +161,7 @@ export default function ManagerHome() {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
     if (arquivo.size > 2 * 1024 * 1024) {
-      toast.error("A imagem deve ter no máximo 2MB");
+      toast.error("Carregue uma imagem com menos mbs");
       return;
     }
     setUploadingFoto(true);
@@ -1067,15 +1070,57 @@ export default function ManagerHome() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Senha Atual</label>
-                  <input type="password" value={passwordForm.atual} onChange={(e) => setPasswordForm({ ...passwordForm, atual: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                  <div className="relative">
+                    <input 
+                      type={showAtual ? "text" : "password"} 
+                      value={passwordForm.atual} 
+                      onChange={(e) => setPasswordForm({ ...passwordForm, atual: e.target.value })} 
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAtual(!showAtual)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                    >
+                      {showAtual ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nova Senha</label>
-                  <input type="password" value={passwordForm.nova} onChange={(e) => setPasswordForm({ ...passwordForm, nova: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                  <div className="relative">
+                    <input 
+                      type={showNova ? "text" : "password"} 
+                      value={passwordForm.nova} 
+                      onChange={(e) => setPasswordForm({ ...passwordForm, nova: e.target.value })} 
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNova(!showNova)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                    >
+                      {showNova ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Confirmar Nova Senha</label>
-                  <input type="password" value={passwordForm.confirmacao} onChange={(e) => setPasswordForm({ ...passwordForm, confirmacao: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                  <div className="relative">
+                    <input 
+                      type={showConfirmacao ? "text" : "password"} 
+                      value={passwordForm.confirmacao} 
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmacao: e.target.value })} 
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmacao(!showConfirmacao)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                    >
+                      {showConfirmacao ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <p className="text-[10px] text-gray-400 italic ml-1">* Preencha os campos acima apenas se desejar alterar sua senha de acesso.</p>

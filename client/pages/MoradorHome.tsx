@@ -15,7 +15,7 @@ import {
   getHorariosDoLocal,
   BASE_URL
 } from "@/services/api";
-import { Users, Clock, Calendar, Menu, X, LogOut, Settings, User, Camera, Lock, ChevronLeft } from "lucide-react";
+import { Users, Clock, Calendar, Menu, X, LogOut, Settings, User, Camera, Lock, ChevronLeft, Eye, EyeOff } from "lucide-react";
 import type { UsuarioDTOResponse, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 
 type ActiveTab = "locais" | "reservas" | "perfil";
@@ -69,6 +69,9 @@ export default function ResidentHome() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [showSenhaAtual, setShowSenhaAtual] = useState(false);
+  const [showNovaSenha, setShowNovaSenha] = useState(false);
+  const [showConfirmarSenha, setShowConfirmarSenha] = useState(false);
 
   useEffect(() => { carregarDados(); }, []);
 
@@ -158,7 +161,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
   if (!arquivo) return;
 
   if (arquivo.size > 2 * 1024 * 1024) {
-    toast.error("A imagem deve ter no máximo 2MB");
+    toast.error("Carregue uma imagem com menos mbs");
     return;
   }
 
@@ -692,33 +695,60 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Senha Atual</label>
-                    <input 
-                      type="password" 
-                      value={editForm.senhaAtual} 
-                      onChange={(e) => setEditForm({ ...editForm, senhaAtual: e.target.value })} 
-                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" 
-                      placeholder="••••••••" 
-                    />
+                    <div className="relative">
+                      <input 
+                        type={showSenhaAtual ? "text" : "password"} 
+                        value={editForm.senhaAtual} 
+                        onChange={(e) => setEditForm({ ...editForm, senhaAtual: e.target.value })} 
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                        placeholder="••••••••" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSenhaAtual(!showSenhaAtual)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                      >
+                        {showSenhaAtual ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nova Senha</label>
-                    <input 
-                      type="password" 
-                      value={editForm.novaSenha} 
-                      onChange={(e) => setEditForm({ ...editForm, novaSenha: e.target.value })} 
-                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" 
-                      placeholder="••••••••" 
-                    />
+                    <div className="relative">
+                      <input 
+                        type={showNovaSenha ? "text" : "password"} 
+                        value={editForm.novaSenha} 
+                        onChange={(e) => setEditForm({ ...editForm, novaSenha: e.target.value })} 
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                        placeholder="••••••••" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNovaSenha(!showNovaSenha)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                      >
+                        {showNovaSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Confirmar Nova Senha</label>
-                    <input 
-                      type="password" 
-                      value={editForm.confirmarSenha} 
-                      onChange={(e) => setEditForm({ ...editForm, confirmarSenha: e.target.value })} 
-                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" 
-                      placeholder="••••••••" 
-                    />
+                    <div className="relative">
+                      <input 
+                        type={showConfirmarSenha ? "text" : "password"} 
+                        value={editForm.confirmarSenha} 
+                        onChange={(e) => setEditForm({ ...editForm, confirmarSenha: e.target.value })} 
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                        placeholder="••••••••" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmarSenha(!showConfirmarSenha)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                      >
+                        {showConfirmarSenha ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-400 italic ml-1">* Preencha os campos acima apenas se desejar alterar sua senha de acesso.</p>

@@ -22,7 +22,7 @@ import {
 } from "@/services/api";
 import type { UsuarioDTOResponse, LocalDTO, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 import { getSenhasProvisoras, salvarSenhaProvisora, removerSenhaProvisora, sincronizarSenhas, type SenhasMap } from "@/services/senhasProvisoras";
-import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar } from "lucide-react";
+import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -100,6 +100,9 @@ export default function OwnerHome() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // ── Formulário ──
   const [formError, setFormError] = useState("");
@@ -251,6 +254,10 @@ export default function OwnerHome() {
       setFormError("Preencha nome, horário de início e fim.");
       return;
     }
+    if (localFormData.foto && localFormData.foto.size > 2 * 1024 * 1024) {
+      setFormError("Carregue uma imagem de até 1MB");
+      return;
+    }
     try {
       const novoLocal = await criarLocal({
         nome: localFormData.nome,
@@ -276,6 +283,10 @@ export default function OwnerHome() {
   async function handleEditLocal() {
     if (!selectedLocal) return;
     setFormError("");
+    if (localFormData.foto && localFormData.foto.size > 2 * 1024 * 1024) {
+      setFormError("Carregue uma imagem de até 2MB");
+      return;
+    }
     try {
       await atualizarLocal(selectedLocal.id, {
         nome: localFormData.nome,
@@ -394,6 +405,10 @@ export default function OwnerHome() {
   async function handleUploadFoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Carregue uma imagem de até 2MB");
+      return;
+    }
     setUploadingFoto(true);
     try {
       await uploadFotoPerfil(file);
@@ -714,7 +729,7 @@ export default function OwnerHome() {
                   className={`text-xs font-bold py-2 px-4 rounded-xl transition-all ${mostrarReservasPassadas
                     ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     : "bg-accent/10 text-accent hover:bg-accent/20"
-                  }`}
+                    }`}
                 >
                   {mostrarReservasPassadas ? "Ocultar Passadas" : "Mostrar Passadas"}
                 </button>
@@ -965,15 +980,57 @@ export default function OwnerHome() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Senha Atual</label>
-                  <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nova Senha</label>
-                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Confirmar Nova Senha</label>
-                  <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <p className="text-[10px] text-gray-400 italic ml-1">* Preencha os campos acima apenas se desejar alterar sua senha de acesso.</p>
