@@ -51,28 +51,28 @@ let refreshPromise: Promise<string | null> | null = null;
 
 async function attemptRefresh(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
-  
+
   refreshPromise = (async () => {
     try {
       const refreshToken = localStorage.getItem("refreshToken");
       const jwtToken = localStorage.getItem("token");
       if (!refreshToken) throw new Error("No refresh token");
-      
+
       const payload: TokenResponseDTO = {
         refreshToken,
         JwtToken: jwtToken ?? undefined
       };
-      
+
       const res = await fetch(`${BASE_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      
+
       if (!res.ok) throw new Error("Refresh failed");
-      
+
       const data: TokenResponseDTO = await res.json();
-      
+
       if (data.JwtToken) {
         localStorage.setItem("token", data.JwtToken);
         if (data.refreshToken) {
@@ -86,13 +86,13 @@ async function attemptRefresh(): Promise<string | null> {
       // ou se o refresh token for inválido. Erros de rede não devem deslogar.
       console.error("Erro no Refresh Token:", err);
       clearSession();
-      window.location.href = "/"; 
+      window.location.href = "/";
       return null;
     } finally {
       refreshPromise = null;
     }
   })();
-  
+
   return refreshPromise;
 }
 
@@ -184,7 +184,7 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export async function login(email: string, senha: string): Promise<{ roles: string[] }> {
   let data: TokenResponseDTO | undefined;
-  
+
   // The first access or login might not return JSON properly if not standard, but let's assume it does.
   data = await http<TokenResponseDTO>("/auth/login", {
     method: "POST",
@@ -320,8 +320,6 @@ export async function deletarReserva(id: number): Promise<ReservaDTOResponse> {
 }
 
 export async function getHorariosDoLocal(idLocal: number, data: string): Promise<any[]> {
-  // Ajuste o caminho base dependendo de qual Controller (ReservaController ou LocalController) você colocou o método.
-  // Assumindo que foi no ReservaController:
   return http<any[]>(`/reservas/${idLocal}/${data}`);
 }
 

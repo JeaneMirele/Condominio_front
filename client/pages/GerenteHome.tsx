@@ -953,11 +953,11 @@ export default function ManagerHome() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">E-mail</label>
-                            <input type="email" value={residentFormData.email} onChange={(e) => setResidentFormData({ ...residentFormData, email: e.target.value })} disabled={showEditResidentModal} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm disabled:opacity-50" />
+                            <input type="email" value={residentFormData.email} onChange={(e) => setResidentFormData({ ...residentFormData, email: e.target.value })} disabled={showEditResidentModal} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm disabled:opacity-50" placeholder="jose@condominio.com" />
                           </div>
                           <div>
                             <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">CPF</label>
-                            <input type="text" value={residentFormData.cpf} onChange={(e) => setResidentFormData({ ...residentFormData, cpf: e.target.value })} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
+                            <input type="text" value={residentFormData.cpf} onChange={(e) => setResidentFormData({ ...residentFormData, cpf: e.target.value })} className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" placeholder="123-456-789-90" />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -967,9 +967,9 @@ export default function ManagerHome() {
                           </div>
                           <div>
                             <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Unidade</label>
-                            <select 
-                              value={residentFormData.id_unidade} 
-                              onChange={(e) => setResidentFormData({ ...residentFormData, id_unidade: e.target.value })} 
+                            <select
+                              value={residentFormData.id_unidade}
+                              onChange={(e) => setResidentFormData({ ...residentFormData, id_unidade: e.target.value })}
                               className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm"
                             >
                               <option value="">Selecione uma unidade</option>
@@ -1027,7 +1027,13 @@ export default function ManagerHome() {
             <div className="flex flex-col items-center gap-4">
               <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white flex-shrink-0 group">
                 <img
-                  src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"}
+                  src={(() => {
+                    if (!usuarioLogado?.foto) return "/icone.png";
+                    if (usuarioLogado.foto.startsWith('http')) return usuarioLogado.foto;
+                    let path = usuarioLogado.foto.startsWith('/') ? usuarioLogado.foto : '/' + usuarioLogado.foto;
+                    if (!path.includes('/arquivos/')) path = '/arquivos' + path;
+                    return `${BASE_URL}${path}`;
+                  })()}
                   className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`}
                   alt="Perfil"
                 />
@@ -1071,11 +1077,11 @@ export default function ManagerHome() {
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Senha Atual</label>
                   <div className="relative">
-                    <input 
-                      type={showAtual ? "text" : "password"} 
-                      value={passwordForm.atual} 
-                      onChange={(e) => setPasswordForm({ ...passwordForm, atual: e.target.value })} 
-                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                    <input
+                      type={showAtual ? "text" : "password"}
+                      value={passwordForm.atual}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, atual: e.target.value })}
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
                     />
                     <button
                       type="button"
@@ -1089,11 +1095,11 @@ export default function ManagerHome() {
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nova Senha</label>
                   <div className="relative">
-                    <input 
-                      type={showNova ? "text" : "password"} 
-                      value={passwordForm.nova} 
-                      onChange={(e) => setPasswordForm({ ...passwordForm, nova: e.target.value })} 
-                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                    <input
+                      type={showNova ? "text" : "password"}
+                      value={passwordForm.nova}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, nova: e.target.value })}
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
                     />
                     <button
                       type="button"
@@ -1107,11 +1113,11 @@ export default function ManagerHome() {
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-600 uppercase ml-1">Confirmar Nova Senha</label>
                   <div className="relative">
-                    <input 
-                      type={showConfirmacao ? "text" : "password"} 
-                      value={passwordForm.confirmacao} 
-                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmacao: e.target.value })} 
-                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
+                    <input
+                      type={showConfirmacao ? "text" : "password"}
+                      value={passwordForm.confirmacao}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmacao: e.target.value })}
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
                     />
                     <button
                       type="button"

@@ -15,7 +15,7 @@ import {
   getHorariosDoLocal,
   BASE_URL
 } from "@/services/api";
-import { Users, Clock, Calendar, Menu, X, LogOut, Settings, User, Camera, Lock, ChevronLeft, Eye, EyeOff } from "lucide-react";
+import { Users, Clock, Calendar, Menu, X, LogOut, Settings, User, Camera, Lock, ChevronLeft, Eye, EyeOff, History } from "lucide-react";
 import type { UsuarioDTOResponse, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 
 type ActiveTab = "locais" | "reservas" | "perfil";
@@ -43,12 +43,11 @@ export default function ResidentHome() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedReservaForCancel, setSelectedReservaForCancel] = useState<ReservaDTOResponse | null>(null);
   const [filtroData, setFiltroData] = useState("");
-  const [mostrarReservasPassadas, setMostrarReservasPassadas] = useState(false);
-
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [formData, setFormData] = useState({ facilityId: "", date: "", startTime: "", endTime: "" });
-  const [editForm, setEditForm] = useState({ 
+  const [editForm, setEditForm] = useState({
     nome: "", email: "", telefone: "",
-    senhaAtual: "", novaSenha: "", confirmarSenha: "" 
+    senhaAtual: "", novaSenha: "", confirmarSenha: ""
   });
 
   useEffect(() => {
@@ -87,7 +86,7 @@ export default function ResidentHome() {
               if (Array.isArray(item) && typeof item[0] === 'string') {
                 const start = item[0].substring(0, 5);
                 const end = item[1].substring(0, 5);
-                
+
                 // Adiciona todas as horas entre início e fim (exclusivo no fim)
                 const hStart = parseInt(start.split(":")[0]);
                 const hEnd = parseInt(end.split(":")[0]);
@@ -110,12 +109,12 @@ export default function ResidentHome() {
       const [perfil, resList, locList] = await Promise.all([getMeuPerfil(), getReservas(), getLocais()]);
       setUsuarioLogado(perfil);
       setLocaisDB(locList || []);
-      
+
       // Filtro mais robusto para evitar problemas de tipo (String vs Number)
-      const minhasReservas = Array.isArray(resList) 
+      const minhasReservas = Array.isArray(resList)
         ? resList.filter((r) => String(r?.morador?.id) === String(perfil?.id))
         : [];
-        
+
       setReservas(minhasReservas);
       setTodasReservas(Array.isArray(resList) ? resList : []);
     } catch (err) {
@@ -126,66 +125,66 @@ export default function ResidentHome() {
     }
   }
 
-function prepararEdicao(res: ReservaDTOResponse) {
-  setSelectedReserva(res);
-  setFormData({
-    facilityId: res.local.id.toString(),
-    date: res.data,
-    startTime: res.horaEntrada.substring(0, 5),
-    endTime: res.horaSaida.substring(0, 5)
-  });
-  setShowEditReservation(true);
-}
-
-const handleUpdateReservation = async () => {
-  if (!selectedReserva) return;
-  try {
-    await atualizarReserva(selectedReserva.id, {
-      id_local: parseInt(formData.facilityId),
-      id_morador: usuarioLogado!.id,
-      data: formData.date,
-      horaEntrada: formData.startTime + ":00",
-      horaSaida: formData.endTime + ":00",
+  function prepararEdicao(res: ReservaDTOResponse) {
+    setSelectedReserva(res);
+    setFormData({
+      facilityId: res.local.id.toString(),
+      date: res.data,
+      startTime: res.horaEntrada.substring(0, 5),
+      endTime: res.horaSaida.substring(0, 5)
     });
-    toast.success("Reserva atualizada com sucesso!");
-    setShowEditReservation(false);
-    setFormData({ facilityId: "", date: "", startTime: "", endTime: "" });
-    carregarDados();
-  } catch (err: any) {
-    toast.error(err?.message || "Erro ao atualizar reserva.");
-  }
-};
-
-async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
-  const arquivo = e.target.files?.[0];
-  if (!arquivo) return;
-
-  if (arquivo.size > 2 * 1024 * 1024) {
-    toast.error("Carregue uma imagem com menos mbs");
-    return;
+    setShowEditReservation(true);
   }
 
-  setUploadingFoto(true);
-  try {
-  
-    await uploadFotoPerfil(arquivo);
-    toast.success("Foto atualizada com sucesso!");
-    carregarDados(); 
-  } catch (err: any) {
-    toast.error(err?.message || "Erro ao fazer upload da foto.");
-  } finally {
-    setUploadingFoto(false);
+  const handleUpdateReservation = async () => {
+    if (!selectedReserva) return;
+    try {
+      await atualizarReserva(selectedReserva.id, {
+        id_local: parseInt(formData.facilityId),
+        id_morador: usuarioLogado!.id,
+        data: formData.date,
+        horaEntrada: formData.startTime + ":00",
+        horaSaida: formData.endTime + ":00",
+      });
+      toast.success("Reserva atualizada com sucesso!");
+      setShowEditReservation(false);
+      setFormData({ facilityId: "", date: "", startTime: "", endTime: "" });
+      carregarDados();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao atualizar reserva.");
+    }
+  };
+
+  async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+
+    if (arquivo.size > 2 * 1024 * 1024) {
+      toast.error("Carregue uma imagem com menos mbs");
+      return;
+    }
+
+    setUploadingFoto(true);
+    try {
+
+      await uploadFotoPerfil(arquivo);
+      toast.success("Foto atualizada com sucesso!");
+      carregarDados();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao fazer upload da foto.");
+    } finally {
+      setUploadingFoto(false);
+    }
   }
-}
 
   const getHorarios = () => {
     if (!formData.facilityId) return [];
     const local = locaisDB.find(l => l.id?.toString() === formData.facilityId);
     if (!local) return [];
-    
+
     const inicioStr = local.horarioInicio || "08:00";
     const fimStr = local.horarioFim || "22:00";
-    
+
     const startHour = parseInt(inicioStr.split(":")[0]);
     const endHour = parseInt(fimStr.split(":")[0]);
 
@@ -198,11 +197,11 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
 
   const getHorariosEntradaDisponiveis = () => {
     const todosHorarios = getHorarios();
-    if (todosHorarios.length > 0) todosHorarios.pop(); 
+    if (todosHorarios.length > 0) todosHorarios.pop();
 
     if (!formData.date) return todosHorarios;
 
-    const reservasDoDia = todasReservas.filter(r => 
+    const reservasDoDia = todasReservas.filter(r =>
       r.local?.id?.toString() === formData.facilityId &&
       r.data === formData.date &&
       r.status !== "CANCELADA" &&
@@ -210,6 +209,20 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
     );
 
     return todosHorarios.filter(horaStr => {
+      // Se a data selecionada for menor que hoje, não permite nenhum horário
+      if (formData.date && formData.date < hojeString) return false;
+
+      // Verifica se a data é hoje para não mostrar horários que já passaram
+      if (formData.date === hojeString) {
+        const agora = new Date();
+        const h = agora.getHours().toString().padStart(2, '0');
+        const m = agora.getMinutes().toString().padStart(2, '0');
+        const horaAtual = `${h}:${m}`;
+        
+        const timeToMins = (t: string) => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]);
+        if (timeToMins(horaStr) <= timeToMins(horaAtual)) return false;
+      }
+
       // 1. Verifica se está na lista de horários ocupados do backend (nova API)
       if (horariosOcupadosBackend.includes(horaStr)) return false;
 
@@ -217,7 +230,10 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
       return !reservasDoDia.some(r => {
         const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
         const resEnd = (r.horaSaida || "23:59:59").substring(0, 5);
-        return horaStr >= resStart && horaStr < resEnd;
+        
+        const timeToMins = (t: string) => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]);
+        const strMins = timeToMins(horaStr);
+        return strMins >= timeToMins(resStart) && strMins < timeToMins(resEnd);
       });
     });
   };
@@ -225,34 +241,37 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
   const getHorariosSaidaDisponiveis = (start = formData.startTime) => {
     if (!start) return [];
     const todosHorarios = getHorarios();
-    
-    const reservasDoDia = todasReservas.filter(r => 
+
+    const reservasDoDia = todasReservas.filter(r =>
       r.local?.id?.toString() === formData.facilityId &&
       r.data === formData.date &&
       r.status !== "CANCELADA" &&
       (!showEditReservation || r.id !== selectedReserva?.id)
     );
 
+    const timeToMins = (t: string) => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1] || "0");
+
     // O máximo possível é o fechamento do local
     let maxEnd = todosHorarios[todosHorarios.length - 1];
-    
+
     // Verifica a próxima reserva para limitar o horário de saída
     reservasDoDia.forEach(r => {
       const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
-      if (resStart > start && resStart < maxEnd) {
+      if (timeToMins(resStart) > timeToMins(start) && timeToMins(resStart) < timeToMins(maxEnd)) {
         maxEnd = resStart;
       }
     });
 
     // Também verifica as ocupações do backend
     horariosOcupadosBackend.forEach(horaStr => {
-      if (horaStr > start && horaStr < maxEnd) {
+      if (timeToMins(horaStr) > timeToMins(start) && timeToMins(horaStr) < timeToMins(maxEnd)) {
         maxEnd = horaStr;
       }
     });
 
     return todosHorarios.filter(horaStr => {
-      return horaStr > start && horaStr <= maxEnd;
+      const strMins = timeToMins(horaStr);
+      return strMins > timeToMins(start) && strMins <= timeToMins(maxEnd);
     });
   };
 
@@ -304,9 +323,9 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
 
       // 3. Atualizar Senha se necessário
       if (trocandoSenha) {
-        await alterarSenha({ 
-          senhaAtual: editForm.senhaAtual, 
-          novaSenha: editForm.novaSenha 
+        await alterarSenha({
+          senhaAtual: editForm.senhaAtual,
+          novaSenha: editForm.novaSenha
         });
         setEditForm(prev => ({ ...prev, senhaAtual: "", novaSenha: "", confirmarSenha: "" }));
       }
@@ -326,11 +345,10 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
   const NavItem = ({ id, label, icon: Icon }: { id: ActiveTab, label: string, icon: any }) => (
     <button
       onClick={() => { setActiveTab(id); setShowSidebar(false); }}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-        activeTab === id 
-        ? "bg-accent text-white shadow-lg shadow-accent/20 font-bold" 
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === id
+        ? "bg-accent text-white shadow-lg shadow-accent/20 font-bold"
         : "text-gray-500 hover:bg-gray-100 font-medium"
-      }`}
+        }`}
     >
       <Icon className="w-5 h-5" />
       <span>{label}</span>
@@ -364,21 +382,21 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
             <button onClick={() => setShowSidebar(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors">
               <X className="w-6 h-6" />
             </button>
-            
+
             <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg mb-4 bg-white group">
-              <img 
-                src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"} 
-                className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${uploadingFoto ? 'opacity-30' : ''}`} 
-                alt="Perfil" 
+              <img
+                src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"}
+                className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${uploadingFoto ? 'opacity-30' : ''}`}
+                alt="Perfil"
               />
-              <button 
+              <button
                 onClick={() => { setActiveTab("perfil"); setShowSidebar(false); }}
                 className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <Camera className="w-6 h-6 text-white" />
               </button>
             </div>
-            
+
             <h3 className="font-bold text-gray-900 text-lg mb-0.5">{usuarioLogado?.nome}</h3>
             <p className="text-[10px] font-bold text-accent uppercase">{usuarioLogado?.roles?.[0] || 'Morador'}</p>
           </div>
@@ -390,7 +408,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
 
           {/* Drawer Footer */}
           <div className="p-4 border-t border-gray-100 mt-auto">
-            <button 
+            <button
               onClick={handleSignOut}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 font-bold transition-all"
             >
@@ -421,7 +439,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        
+
         {/* Horizontal Navigation (Fallback for quick access) */}
         {activeTab !== "perfil" && (
           <div className="flex gap-2 mb-10 border-b border-gray-200 overflow-x-auto pb-px">
@@ -435,9 +453,8 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-6 py-3 font-bold text-sm border-b-2 transition-all whitespace-nowrap ${
-                    activeTab === tab ? "border-accent text-accent" : "border-transparent text-gray-400 hover:text-gray-600"
-                  }`}
+                  className={`px-6 py-3 font-bold text-sm border-b-2 transition-all whitespace-nowrap ${activeTab === tab ? "border-accent text-accent" : "border-transparent text-gray-400 hover:text-gray-600"
+                    }`}
                 >
                   {labels[tab]}
                 </button>
@@ -456,10 +473,17 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
               locaisDB.map((local) => (
                 <div key={local.id} className="group bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:border-accent/30 transition-all duration-300 flex flex-col">
                   <div className="relative h-48 overflow-hidden bg-gray-100">
-                    <img 
-                      src={local.fotoUrl ? (local.fotoUrl.startsWith('http') ? local.fotoUrl : `${BASE_URL}${local.fotoUrl}`) : "/icone.png"} 
-                      alt={local.nome} 
-                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${!local.fotoUrl && "p-12 opacity-20"}`}
+                    <img
+                      src={(() => {
+                        const url = local.fotoUrl || (local as any).foto;
+                        if (!url) return "/icone.png";
+                        if (url.startsWith('http')) return url;
+                        let path = url.startsWith('/') ? url : '/' + url;
+                        if (!path.includes('/arquivos/')) path = '/arquivos' + path;
+                        return `${BASE_URL}${path}`;
+                      })()}
+                      alt={local.nome}
+                      className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${(!local.fotoUrl && !(local as any).foto) && "p-12 opacity-20"}`}
                     />
                     <div className="absolute top-3 right-3">
                       <span className="bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-bold text-accent shadow-sm">
@@ -467,14 +491,14 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="p-5 flex-1 flex flex-col">
                     <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-accent transition-colors">{local.nome}</h3>
                     <p className="text-xs text-gray-500 mb-4 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                       {local.localizacao}
                     </p>
-                    
+
                     <div className="grid grid-cols-2 gap-3 mb-6">
                       <div className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-xl">
                         <Users className="w-4 h-4 text-accent" />
@@ -492,13 +516,13 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                       </div>
                     </div>
 
-                    <button 
+                    <button
                       onClick={() => {
-                        setFormData({ 
-                          facilityId: local.id.toString(), 
-                          date: "", 
-                          startTime: local.horarioInicio.substring(0, 5), 
-                          endTime: local.horarioFim.substring(0, 5) 
+                        setFormData({
+                          facilityId: local.id.toString(),
+                          date: "",
+                          startTime: local.horarioInicio.substring(0, 5),
+                          endTime: local.horarioFim.substring(0, 5)
                         });
                         setShowMakeReservation(true);
                       }}
@@ -520,21 +544,18 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
               <h2 className="text-xl font-bold text-gray-900">Minhas Reservas</h2>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setMostrarReservasPassadas(!mostrarReservasPassadas)}
-                  className={`text-xs font-bold py-2 px-4 rounded-xl transition-all ${
-                    mostrarReservasPassadas 
-                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200" 
-                    : "bg-accent/10 text-accent hover:bg-accent/20"
-                  }`}
+                  onClick={() => setShowHistoryModal(true)}
+                  className="text-xs font-bold py-2 px-4 rounded-xl transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2"
                 >
-                  {mostrarReservasPassadas ? "Ocultar Reservas Passadas" : "Mostrar Reservas Passadas"}
+                  <History className="w-4 h-4" />
+                  Ver Histórico
                 </button>
                 <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
-                <input 
-                  type="date" 
-                  value={filtroData} 
-                  onChange={(e) => setFiltroData(e.target.value)} 
-                  className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent" 
+                <input
+                  type="date"
+                  value={filtroData}
+                  onChange={(e) => setFiltroData(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
               </div>
@@ -545,7 +566,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 {(() => {
                   const reservasFiltradas = reservas
                     .filter(r => !filtroData || r.data === filtroData)
-                    .filter(r => mostrarReservasPassadas ? true : (r.data as string) >= hojeString)
+                    .filter(r => (r.data as string) >= hojeString && r.status !== "CANCELADA")
                     .sort((a, b) => {
                       const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
                       const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
@@ -555,7 +576,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   if (reservasFiltradas.length === 0) {
                     return (
                       <div className="p-20 text-center">
-                        <p className="text-gray-400 italic">Nenhuma reserva encontrada{filtroData ? ' para esta data' : ''}.</p>
+                        <p className="text-gray-400 italic">Nenhuma reserva futura encontrada{filtroData ? ' para esta data' : ''}.</p>
                         <button onClick={() => setActiveTab("locais")} className="mt-4 bg-accent hover:bg-accent/90 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors">
                           Ver Locais Disponíveis
                         </button>
@@ -576,67 +597,168 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {reservasFiltradas.map((res) => (
-                        <tr key={res.id} className="hover:bg-gray-50/50 transition-colors group">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-semibold text-gray-900 group-hover:text-accent transition-colors">{res.local?.nome}</div>
-                            <div className="text-[10px] text-gray-500 font-medium">{res.local?.localizacao}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                            {new Date((res.data as string) + "T00:00:00").toLocaleDateString("pt-BR")}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                            {res.horaEntrada?.substring(0, 5)} - {res.horaSaida?.substring(0, 5)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest
-                              ${res.status === "APROVADA" ? "bg-green-100 text-green-700" 
-                              : res.status === "CANCELADA" ? "bg-red-100 text-red-700" 
-                              : "bg-yellow-100 text-yellow-700"}`}>
-                              {res.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end gap-2">
-                              {(res.status !== "CANCELADA" && (!res.data || res.data >= hojeString)) && (
-                                <>
-                                  <button onClick={() => prepararEdicao(res)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-50" title="Editar">
-                                    <span className="text-xs font-bold uppercase tracking-wider">Editar</span>
-                                  </button>
-                                  <button 
-                                    onClick={() => { 
-                                      setSelectedReservaForCancel(res);
-                                      setShowCancelModal(true);
-                                    }} 
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-50"
-                                    title="Cancelar"
-                                  >
-                                    <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                );
-              })()}
+                          <tr key={res.id} className="hover:bg-gray-50/50 transition-colors group">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="font-semibold text-gray-900 group-hover:text-accent transition-colors">{res.local?.nome}</div>
+                              <div className="text-[10px] text-gray-500 font-medium">{res.local?.localizacao}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                              {new Date((res.data as string) + "T00:00:00").toLocaleDateString("pt-BR")}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                              {res.horaEntrada?.substring(0, 5)} - {res.horaSaida?.substring(0, 5)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest
+                              ${res.status === "APROVADA" ? "bg-green-100 text-green-700"
+                                  : res.status === "CANCELADA" ? "bg-red-100 text-red-700"
+                                    : "bg-yellow-100 text-yellow-700"}`}>
+                                {res.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex justify-end gap-2">
+                                {(res.status !== "CANCELADA" && (!res.data || res.data >= hojeString)) && (
+                                  <>
+                                    <button onClick={() => prepararEdicao(res)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-50" title="Editar">
+                                      <span className="text-xs font-bold uppercase tracking-wider">Editar</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedReservaForCancel(res);
+                                        setShowCancelModal(true);
+                                      }}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-50"
+                                      title="Cancelar"
+                                    >
+                                      <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
             </div>
+          </div>
+        )}
+
+        {/* Modal de Histórico */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+              <div className="p-6 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+                  <History className="w-6 h-6 text-accent" />
+                  Histórico de Reservas
+                </h3>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shadow-sm"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 sm:p-8 overflow-y-auto">
+                <div className="flex justify-end mb-6">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
+                    <input
+                      type="date"
+                      value={filtroData}
+                      onChange={(e) => setFiltroData(e.target.value)}
+                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    {(() => {
+                      const reservasFiltradas = reservas
+                        .filter(r => !filtroData || r.data === filtroData)
+                        .filter(r => (r.data as string) < hojeString || r.status === "CANCELADA")
+                        .sort((a, b) => {
+                          const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
+                          const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
+                          return dateB.getTime() - dateA.getTime();
+                        });
+
+                      if (reservasFiltradas.length === 0) {
+                        return (
+                          <div className="p-12 text-center">
+                            <p className="text-gray-400 italic">Nenhuma reserva passada encontrada{filtroData ? ' para esta data' : ''}.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
+                              <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Local</th>
+                              <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Data</th>
+                              <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Horário</th>
+                              <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {reservasFiltradas.map((res) => (
+                              <tr key={res.id} className="hover:bg-gray-50/50 transition-colors group opacity-80">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="font-semibold text-gray-900 group-hover:text-accent transition-colors">{res.local?.nome}</div>
+                                  <div className="text-[10px] text-gray-500 font-medium">{res.local?.localizacao}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                                  {new Date((res.data as string) + "T00:00:00").toLocaleDateString("pt-BR")}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                                  {res.horaEntrada?.substring(0, 5)} - {res.horaSaida?.substring(0, 5)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest
+                                  ${res.status === "APROVADA" ? "bg-gray-100 text-gray-700"
+                                      : res.status === "CANCELADA" ? "bg-red-50 text-red-700"
+                                        : "bg-gray-100 text-gray-700"}`}>
+                                    {res.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {activeTab === "perfil" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl mx-auto relative">
-            
+
             <div className="flex justify-center mb-16 border-b border-gray-100 pb-12">
               <div className="flex flex-col items-center gap-4">
                 <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white flex-shrink-0 group">
-                  <img 
-                    src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"} 
-                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`} 
-                    alt="Perfil" 
+                  <img
+                    src={(() => {
+                      if (!usuarioLogado?.foto) return "/icone.png";
+                      if (usuarioLogado.foto.startsWith('http')) return usuarioLogado.foto;
+                      let path = usuarioLogado.foto.startsWith('/') ? usuarioLogado.foto : '/' + usuarioLogado.foto;
+                      if (!path.includes('/arquivos/')) path = '/arquivos' + path;
+                      return `${BASE_URL}${path}`;
+                    })()}
+                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`}
+                    alt="Perfil"
                   />
                   {uploadingFoto && (
                     <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-sm">
@@ -658,33 +780,33 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 <div className="space-y-8">
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nome Completo</label>
-                    <input 
-                      type="text" 
-                      value={editForm.nome} 
-                      onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} 
-                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" 
-                      placeholder="Ex: Maria Silva" 
+                    <input
+                      type="text"
+                      value={editForm.nome}
+                      onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })}
+                      className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all"
+                      placeholder="Ex: Maria Silva"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                     <div className="space-y-3">
                       <label className="text-xs font-bold text-gray-600 uppercase ml-1">E-mail</label>
-                      <input 
-                        type="email" 
-                        value={editForm.email} 
-                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} 
-                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" 
-                        placeholder="seu@email.com" 
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all"
+                        placeholder="seu@email.com"
                       />
                     </div>
                     <div className="space-y-3">
                       <label className="text-xs font-bold text-gray-600 uppercase ml-1">Telefone</label>
-                      <input 
-                        type="tel" 
-                        value={editForm.telefone} 
-                        onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })} 
-                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" 
-                        placeholder="(00) 00000-0000" 
+                      <input
+                        type="tel"
+                        value={editForm.telefone}
+                        onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })}
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all"
+                        placeholder="(00) 00000-0000"
                       />
                     </div>
                   </div>
@@ -696,12 +818,12 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Senha Atual</label>
                     <div className="relative">
-                      <input 
-                        type={showSenhaAtual ? "text" : "password"} 
-                        value={editForm.senhaAtual} 
-                        onChange={(e) => setEditForm({ ...editForm, senhaAtual: e.target.value })} 
-                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
-                        placeholder="••••••••" 
+                      <input
+                        type={showSenhaAtual ? "text" : "password"}
+                        value={editForm.senhaAtual}
+                        onChange={(e) => setEditForm({ ...editForm, senhaAtual: e.target.value })}
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
+                        placeholder="••••••••"
                       />
                       <button
                         type="button"
@@ -715,12 +837,12 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Nova Senha</label>
                     <div className="relative">
-                      <input 
-                        type={showNovaSenha ? "text" : "password"} 
-                        value={editForm.novaSenha} 
-                        onChange={(e) => setEditForm({ ...editForm, novaSenha: e.target.value })} 
-                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
-                        placeholder="••••••••" 
+                      <input
+                        type={showNovaSenha ? "text" : "password"}
+                        value={editForm.novaSenha}
+                        onChange={(e) => setEditForm({ ...editForm, novaSenha: e.target.value })}
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
+                        placeholder="••••••••"
                       />
                       <button
                         type="button"
@@ -734,12 +856,12 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Confirmar Nova Senha</label>
                     <div className="relative">
-                      <input 
-                        type={showConfirmarSenha ? "text" : "password"} 
-                        value={editForm.confirmarSenha} 
-                        onChange={(e) => setEditForm({ ...editForm, confirmarSenha: e.target.value })} 
-                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12" 
-                        placeholder="••••••••" 
+                      <input
+                        type={showConfirmarSenha ? "text" : "password"}
+                        value={editForm.confirmarSenha}
+                        onChange={(e) => setEditForm({ ...editForm, confirmarSenha: e.target.value })}
+                        className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all pr-12"
+                        placeholder="••••••••"
                       />
                       <button
                         type="button"
@@ -756,16 +878,16 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
 
               <div className="pt-8 flex flex-col sm:flex-row items-center justify-end gap-4 sm:gap-6">
                 {editError && <p className="text-xs text-red-500 font-bold">{editError}</p>}
-                
-                <button 
+
+                <button
                   onClick={() => setActiveTab("locais")}
                   className="w-full sm:w-auto px-8 py-5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-xs font-bold uppercase hover:bg-gray-50 hover:text-accent hover:border-accent transition-all active:scale-95"
                 >
                   Voltar
                 </button>
 
-                <button 
-                  onClick={() => handleSalvarPerfil()} 
+                <button
+                  onClick={() => handleSalvarPerfil()}
                   disabled={savingProfile}
                   className="w-full sm:w-auto px-12 py-5 bg-accent text-white rounded-2xl text-sm font-bold uppercase hover:bg-accent/90 transition-all shadow-xl shadow-accent/20 active:scale-95 disabled:opacity-50"
                 >
@@ -784,7 +906,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
               <h3 className="text-2xl font-bold text-gray-900 tracking-tight">
                 {showEditReservation ? "Editar Reserva" : "Reservar Espaço"}
               </h3>
-              <button 
+              <button
                 onClick={() => { setShowMakeReservation(false); setShowEditReservation(false); }}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
               >
@@ -795,9 +917,9 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
             <div className="space-y-5">
               <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Local Selecionado</label>
-                <select 
-                  value={formData.facilityId} 
-                  onChange={e => setFormData({...formData, facilityId: e.target.value})} 
+                <select
+                  value={formData.facilityId}
+                  onChange={e => setFormData({ ...formData, facilityId: e.target.value })}
                   className="w-full px-0 bg-transparent border-none text-gray-900 font-bold focus:ring-0 text-lg cursor-pointer appearance-none"
                 >
                   <option value="" disabled>Escolha um local...</option>
@@ -809,7 +931,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 </select>
                 {formData.facilityId && (
                   <p className="text-[10px] text-accent font-bold mt-1">
-                    {locaisDB.find(l => l.id.toString() === formData.facilityId)?.horarioInicio.substring(0,5)} às {locaisDB.find(l => l.id.toString() === formData.facilityId)?.horarioFim.substring(0,5)}
+                    {locaisDB.find(l => l.id.toString() === formData.facilityId)?.horarioInicio.substring(0, 5)} às {locaisDB.find(l => l.id.toString() === formData.facilityId)?.horarioFim.substring(0, 5)}
                   </p>
                 )}
               </div>
@@ -818,11 +940,12 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Data da Reserva</label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input 
-                    type="date" 
-                    value={formData.date} 
-                    onChange={e => setFormData({...formData, date: e.target.value})} 
-                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm" 
+                  <input
+                    type="date"
+                    min={hojeString}
+                    value={formData.date}
+                    onChange={e => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm"
                   />
                 </div>
               </div>
@@ -832,22 +955,14 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Entrada</label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <select 
-                      value={formData.startTime} 
+                    <select
+                      value={formData.startTime}
                       onChange={e => {
                         const newStart = e.target.value;
-                        const saidas = getHorariosSaidaDisponiveis(newStart);
-                        // Se houver apenas uma saída, seleciona ela. 
-                        // Caso contrário, se o endTime atual não estiver mais na lista, limpa ele.
-                        let newEnd = formData.endTime;
-                        if (saidas.length === 1) {
-                          newEnd = saidas[0];
-                        } else if (!saidas.includes(formData.endTime)) {
-                          newEnd = "";
-                        }
-                        setFormData({...formData, startTime: newStart, endTime: newEnd});
-                      }} 
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none" 
+                        // Sempre que a entrada mudar, obriga a selecionar uma nova saída para garantir a consistência
+                        setFormData({ ...formData, startTime: newStart, endTime: "" });
+                      }}
+                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none"
                     >
                       <option value="" disabled>Selecione</option>
                       {getHorariosEntradaDisponiveis().map(h => (
@@ -862,17 +977,17 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Saída</label>
+                  <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ml-1 ${!formData.startTime ? 'text-gray-300' : 'text-gray-400'}`}>Saída</label>
                   <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <select 
-                      value={formData.endTime} 
-                      onChange={e => setFormData({...formData, endTime: e.target.value})} 
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none" 
-                      disabled={!formData.startTime}
+                    <Clock className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${!formData.startTime ? 'text-gray-300' : 'text-gray-400'}`} />
+                    <select
+                      value={formData.endTime}
+                      onChange={e => setFormData({ ...formData, endTime: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none ${!formData.startTime ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'}`}
+                      disabled={!formData.startTime || formData.startTime === ""}
                     >
-                      <option value="" disabled>Selecione</option>
-                      {getHorariosSaidaDisponiveis().map(h => (
+                      <option value="" disabled>Selecione após a entrada</option>
+                      {formData.startTime && getHorariosSaidaDisponiveis().map(h => (
                         <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
@@ -881,14 +996,14 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
               </div>
 
               <div className="flex gap-3 pt-6">
-                <button 
-                  onClick={() => { setShowMakeReservation(false); setShowEditReservation(false); }} 
+                <button
+                  onClick={() => { setShowMakeReservation(false); setShowEditReservation(false); }}
                   className="flex-1 py-3.5 bg-gray-50 text-gray-500 rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors"
                 >
                   Cancelar
                 </button>
-                <button 
-                  onClick={showEditReservation ? handleUpdateReservation : handleMakeReservation} 
+                <button
+                  onClick={showEditReservation ? handleUpdateReservation : handleMakeReservation}
                   className="flex-[2] py-3.5 bg-accent text-white rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-accent/90 transition-all shadow-lg shadow-accent/20 active:scale-[0.98]"
                 >
                   {showEditReservation ? "Salvar Alterações" : "Confirmar Reserva"}
@@ -911,16 +1026,16 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                 Tem certeza que deseja cancelar sua reserva no(a) <strong>{selectedReservaForCancel.local?.nome}</strong> para o dia {new Date((selectedReservaForCancel.data as string) + "T00:00:00").toLocaleDateString("pt-BR")}?
               </p>
             </div>
-            
+
             <div className="flex gap-3">
-              <button 
-                onClick={() => setShowCancelModal(false)} 
+              <button
+                onClick={() => setShowCancelModal(false)}
                 className="flex-1 py-3 bg-gray-50 text-gray-500 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors"
                 disabled={loading}
               >
                 Voltar
               </button>
-              <button 
+              <button
                 onClick={async () => {
                   try {
                     setLoading(true);
@@ -933,7 +1048,7 @@ async function handleTrocarFoto(e: React.ChangeEvent<HTMLInputElement>) {
                   } finally {
                     setLoading(false);
                   }
-                }} 
+                }}
                 className="flex-[1.5] py-3 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200 active:scale-95 disabled:opacity-50"
                 disabled={loading}
               >

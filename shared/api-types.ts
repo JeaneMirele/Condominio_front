@@ -43,6 +43,8 @@ export interface UsuarioDTOResponse {
   telefone?: string;
   endereco?: EnderecoDTOResponse;
   unidade?: UnidadeDTOResponse;
+  id_unidade?: number;
+  idUnidade?: number;
   foto?: string;
   roles?: Role[];
   senha?: string;

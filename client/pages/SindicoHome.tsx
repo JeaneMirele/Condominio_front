@@ -22,7 +22,7 @@ import {
 } from "@/services/api";
 import type { UsuarioDTOResponse, LocalDTO, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 import { getSenhasProvisoras, salvarSenhaProvisora, removerSenhaProvisora, sincronizarSenhas, type SenhasMap } from "@/services/senhasProvisoras";
-import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff } from "lucide-react";
+import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff, History } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -36,8 +36,6 @@ import {
   CartesianGrid,
   Legend
 } from "recharts";
-
-// ─── Tipos e constantes ────────────────────────────────────────────────────
 
 type ActiveTab = "managers" | "syndics" | "reservations" | "areas" | "overview" | "perfil";
 
@@ -85,8 +83,8 @@ export default function OwnerHome() {
   const [showDeleteReservaModal, setShowDeleteReservaModal] = useState(false);
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [mostrarReservasPassadas, setMostrarReservasPassadas] = useState(false);
   const [filtroDataSindico, setFiltroDataSindico] = useState("");
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // ── Perfil ──
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -359,12 +357,10 @@ export default function OwnerHome() {
     setSavingProfile(true);
     setFormError("");
     try {
-      // 1. Validar troca de senha se houver algo preenchido
+
       const trocandoSenha = newPassword || confirmPassword;
       if (trocandoSenha) {
-        // Para o Síndico, vamos assumir que ele não precisa da senha atual 
-        // se a implementação anterior não pedia, ou vamos manter a lógica de Morador
-        // No Síndico original, ele só pedia Nova e Confirmação.
+
         if (newPassword.length < 6) throw new Error("A nova senha deve ter pelo menos 6 caracteres.");
         if (newPassword !== confirmPassword) throw new Error("As novas senhas não coincidem.");
       }
@@ -710,6 +706,13 @@ export default function OwnerHome() {
             <div className="flex flex-wrap justify-between items-center gap-3">
               <h2 className="text-xl font-bold text-gray-900">Reservas</h2>
               <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setShowHistoryModal(true)}
+                  className="text-xs font-bold py-2 px-4 rounded-xl transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2"
+                >
+                  <History className="w-4 h-4" />
+                  Ver Histórico
+                </button>
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Filtrar por data:</label>
                   <input
@@ -724,22 +727,13 @@ export default function OwnerHome() {
                     </button>
                   )}
                 </div>
-                <button
-                  onClick={() => setMostrarReservasPassadas(!mostrarReservasPassadas)}
-                  className={`text-xs font-bold py-2 px-4 rounded-xl transition-all ${mostrarReservasPassadas
-                    ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    : "bg-accent/10 text-accent hover:bg-accent/20"
-                    }`}
-                >
-                  {mostrarReservasPassadas ? "Ocultar Passadas" : "Mostrar Passadas"}
-                </button>
               </div>
             </div>
             <div className="overflow-x-auto">
               {(() => {
                 const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
                 const reservasFiltradas = reservas
-                  .filter(r => mostrarReservasPassadas ? true : (r.data as string) >= hojeString)
+                  .filter(r => (r.data as string) >= hojeString && r.status !== 'CANCELADA')
                   .filter(r => !filtroDataSindico || r.data === filtroDataSindico)
                   .sort((a, b) => {
                     const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
@@ -795,6 +789,93 @@ export default function OwnerHome() {
           </div>
         )}
 
+        {/* Modal de Histórico */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+              <div className="p-6 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+                  <History className="w-6 h-6 text-accent" />
+                  Histórico de Reservas
+                </h3>
+                <button
+                  onClick={() => setShowHistoryModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shadow-sm"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 sm:p-8 overflow-y-auto">
+                <div className="flex justify-end mb-6">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
+                    <input
+                      type="date"
+                      value={filtroDataSindico}
+                      onChange={(e) => setFiltroDataSindico(e.target.value)}
+                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
+                    {filtroDataSindico && <button onClick={() => setFiltroDataSindico("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    {(() => {
+                      const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                      const reservasFiltradas = reservas
+                        .filter(r => (r.data as string) < hojeString || r.status === 'CANCELADA')
+                        .filter(r => !filtroDataSindico || r.data === filtroDataSindico)
+                        .sort((a, b) => {
+                          const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
+                          const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
+                          return dateB.getTime() - dateA.getTime();
+                        });
+
+                      if (reservasFiltradas.length === 0) {
+                        return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva passada encontrada.</p>;
+                      }
+
+                      return (
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              {["Morador", "Local", "Data", "Hora", "Status"].map((h) => (
+                                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 sm:text-sm">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {reservasFiltradas.map((r) => (
+                              <tr key={r.id} className="border-b border-gray-100 bg-white hover:bg-gray-50 transition-colors opacity-80">
+                                <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                                  {r.morador?.nome}<br />
+                                  <span className="text-gray-500 text-xs">{r.morador?.email}</span>
+                                </td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{r.local?.nome}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700">{formatarData(r.data)}</td>
+                                <td className="px-4 py-4 text-sm text-gray-700 whitespace-nowrap">
+                                  {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
+                                </td>
+                                <td className="px-4 py-4">
+                                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${badgeStatus(r.status)}`}>
+                                    {r.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === "areas" && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -819,7 +900,18 @@ export default function OwnerHome() {
                   <div key={l.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:border-accent hover:shadow-md transition-all flex flex-col">
                     <div className="w-full h-48 bg-gray-100 relative">
                       {/* Fallback pattern to user defaults properly mapped in DB fotoUrl */}
-                      <img src={l.fotoUrl || "/icone.png"} alt={l.nome} className={`w-full h-full object-cover ${!l.fotoUrl && "p-6 opacity-30"}`} />
+                      <img
+                        src={(() => {
+                          const url = l.fotoUrl || (l as any).foto;
+                          if (!url) return "/icone.png";
+                          if (url.startsWith('http')) return url;
+                          let path = url.startsWith('/') ? url : '/' + url;
+                          if (!path.includes('/arquivos/')) path = '/arquivos' + path;
+                          return `${BASE_URL}${path}`;
+                        })()}
+                        alt={l.nome}
+                        className={`w-full h-full object-cover ${(!l.fotoUrl && !(l as any).foto) && "p-6 opacity-30"}`}
+                      />
                     </div>
                     <div className="p-5 flex-1 flex flex-col">
                       <div className="flex justify-between items-start mb-2">
@@ -937,7 +1029,13 @@ export default function OwnerHome() {
             <div className="flex flex-col items-center gap-4">
               <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-white flex-shrink-0 group">
                 <img
-                  src={usuarioLogado?.foto ? (usuarioLogado.foto.startsWith('http') ? usuarioLogado.foto : `${BASE_URL}${usuarioLogado.foto}`) : "/icone.png"}
+                  src={(() => {
+                    if (!usuarioLogado?.foto) return "/icone.png";
+                    if (usuarioLogado.foto.startsWith('http')) return usuarioLogado.foto;
+                    let path = usuarioLogado.foto.startsWith('/') ? usuarioLogado.foto : '/' + usuarioLogado.foto;
+                    if (!path.includes('/arquivos/')) path = '/arquivos' + path;
+                    return `${BASE_URL}${path}`;
+                  })()}
                   className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${uploadingFoto ? 'opacity-30' : ''}`}
                   alt="Perfil"
                 />
@@ -1162,8 +1260,8 @@ function FormUsuario({ data, onChange, error, onCancel, onSubmit, submitLabel }:
     <div className="space-y-5">
       {[
         { label: "Nome Completo", key: "nome", type: "text", placeholder: "João Silva" },
-        { label: "Email", key: "email", type: "email", placeholder: "joao@email.com" },
-        { label: "CPF", key: "cpf", type: "text", placeholder: "000.000.000-00" },
+        { label: "Email", key: "email", type: "email", placeholder: "jose@condominio.com" },
+        { label: "CPF", key: "cpf", type: "text", placeholder: "123-456-789-90" },
         { label: "Telefone", key: "telefone", type: "text", placeholder: "(84) 99999-9999" },
       ].map(({ label, key, type, placeholder }) => (
         <div key={key}>
@@ -1205,6 +1303,25 @@ function FormLocal({ data, onChange, error, onCancel, onSubmit, submitLabel }: {
       </div>
       <div>
         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Imagem do Local</label>
+        {data.fotoUrl && !data.foto && (
+          <div className="mb-3 relative w-full h-32 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+            <img
+              src={(() => {
+                const url = data.fotoUrl || (data as any).foto;
+                if (!url || typeof url !== 'string') return "/icone.png";
+                if (url.startsWith('http')) return url;
+                let path = url.startsWith('/') ? url : '/' + url;
+                if (!path.includes('/arquivos/')) path = '/arquivos' + path;
+                return `${BASE_URL}${path}`;
+              })()}
+              className="w-full h-full object-cover opacity-60"
+              alt="Preview"
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest bg-white/80 px-3 py-1 rounded-lg">Imagem Atual</span>
+            </div>
+          </div>
+        )}
         <input type="file" accept="image/*" onChange={(e) => onChange({ ...data, foto: e.target.files?.[0] || null })}
           className="w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none cursor-pointer" />
       </div>
