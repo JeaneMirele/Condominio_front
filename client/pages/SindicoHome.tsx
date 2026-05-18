@@ -891,9 +891,6 @@ export default function OwnerHome() {
               {locais.length === 0 ? (
                 <div className="col-span-full bg-white rounded-2xl border border-gray-100 p-16 text-center">
                   <p className="text-gray-400 italic">Nenhuma área cadastrada.</p>
-                  <button onClick={() => { setLocalFormData(emptyLocalForm); setFormError(""); setShowAddLocalModal(true); }} className="mt-4 bg-accent hover:bg-accent/90 text-white font-bold text-sm px-8 py-3 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95">
-                    Adicionar Lazer
-                  </button>
                 </div>
               ) : (
                 locais.map((l) => (
@@ -1068,7 +1065,18 @@ export default function OwnerHome() {
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Telefone Comercial</label>
-                    <input type="tel" value={editProfileForm.telefone} onChange={(e) => setEditProfileForm({ ...editProfileForm, telefone: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                    <input type="tel" value={editProfileForm.telefone} onChange={(e) => {
+                      const formatTelefone = (val: string) => {
+                        const clean = val.replace(/\D/g, "");
+                        const truncated = clean.slice(0, 11);
+                        if (truncated.length === 0) return "";
+                        if (truncated.length <= 2) return `(${truncated}`;
+                        if (truncated.length <= 6) return `(${truncated.slice(0, 2)}) ${truncated.slice(2)}`;
+                        if (truncated.length <= 10) return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
+                        return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
+                      };
+                      setEditProfileForm({ ...editProfileForm, telefone: formatTelefone(e.target.value) });
+                    }} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
                   </div>
                 </div>
               </div>
@@ -1267,7 +1275,22 @@ function FormUsuario({ data, onChange, error, onCancel, onSubmit, submitLabel }:
         <div key={key}>
           <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">{label}</label>
           <input type={type} value={(data as any)[key]} placeholder={placeholder}
-            onChange={(e) => onChange({ ...data, [key]: e.target.value })}
+            onChange={(e) => {
+              let val = e.target.value;
+              if (key === "telefone") {
+                const formatTelefone = (v: string) => {
+                  const clean = v.replace(/\D/g, "");
+                  const truncated = clean.slice(0, 11);
+                  if (truncated.length === 0) return "";
+                  if (truncated.length <= 2) return `(${truncated}`;
+                  if (truncated.length <= 6) return `(${truncated.slice(0, 2)}) ${truncated.slice(2)}`;
+                  if (truncated.length <= 10) return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
+                  return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
+                };
+                val = formatTelefone(val);
+              }
+              onChange({ ...data, [key]: val });
+            }}
             className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none" />
         </div>
       ))}
@@ -1288,7 +1311,7 @@ function FormLocal({ data, onChange, error, onCancel, onSubmit, submitLabel }: {
   onSubmit: () => void;
   submitLabel: string;
 }) {
-  const TIME_SLOTS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
+  const TIME_SLOTS = Array.from({ length: 23 - 7 + 1 }, (_, i) => `${(i + 7).toString().padStart(2, '0')}:00`);
   return (
     <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
       <div>

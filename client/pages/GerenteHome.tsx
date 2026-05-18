@@ -963,7 +963,18 @@ export default function ManagerHome() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Telefone</label>
-                            <input type="text" maxLength={15} value={residentFormData.telefone} onChange={(e) => setResidentFormData({ ...residentFormData, telefone: e.target.value })} placeholder="(00) 00000-0000" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
+                            <input type="text" maxLength={15} value={residentFormData.telefone} onChange={(e) => {
+                              const formatTelefone = (val: string) => {
+                                const clean = val.replace(/\D/g, "");
+                                const truncated = clean.slice(0, 11);
+                                if (truncated.length === 0) return "";
+                                if (truncated.length <= 2) return `(${truncated}`;
+                                if (truncated.length <= 6) return `(${truncated.slice(0, 2)}) ${truncated.slice(2)}`;
+                                if (truncated.length <= 10) return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
+                                return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
+                              };
+                              setResidentFormData({ ...residentFormData, telefone: formatTelefone(e.target.value) });
+                            }} placeholder="(00) 00000-0000" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 transition-all outline-none shadow-sm" />
                           </div>
                           <div>
                             <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide">Unidade</label>
@@ -1066,7 +1077,18 @@ export default function ManagerHome() {
                   </div>
                   <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-600 uppercase ml-1">Telefone Comercial</label>
-                    <input type="tel" maxLength={15} value={editProfileForm.telefone} onChange={(e) => setEditProfileForm({ ...editProfileForm, telefone: e.target.value })} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
+                    <input type="tel" maxLength={15} value={editProfileForm.telefone} onChange={(e) => {
+                      const formatTelefone = (val: string) => {
+                        const clean = val.replace(/\D/g, "");
+                        const truncated = clean.slice(0, 11);
+                        if (truncated.length === 0) return "";
+                        if (truncated.length <= 2) return `(${truncated}`;
+                        if (truncated.length <= 6) return `(${truncated.slice(0, 2)}) ${truncated.slice(2)}`;
+                        if (truncated.length <= 10) return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
+                        return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
+                      };
+                      setEditProfileForm({ ...editProfileForm, telefone: formatTelefone(e.target.value) });
+                    }} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
                   </div>
                 </div>
               </div>

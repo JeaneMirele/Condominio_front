@@ -521,8 +521,8 @@ export default function ResidentHome() {
                         setFormData({
                           facilityId: local.id.toString(),
                           date: "",
-                          startTime: local.horarioInicio.substring(0, 5),
-                          endTime: local.horarioFim.substring(0, 5)
+                          startTime: "",
+                          endTime: ""
                         });
                         setShowMakeReservation(true);
                       }}
@@ -804,7 +804,18 @@ export default function ResidentHome() {
                       <input
                         type="tel"
                         value={editForm.telefone}
-                        onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })}
+                        onChange={(e) => {
+                          const formatTelefone = (val: string) => {
+                            const clean = val.replace(/\D/g, "");
+                            const truncated = clean.slice(0, 11);
+                            if (truncated.length === 0) return "";
+                            if (truncated.length <= 2) return `(${truncated}`;
+                            if (truncated.length <= 6) return `(${truncated.slice(0, 2)}) ${truncated.slice(2)}`;
+                            if (truncated.length <= 10) return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
+                            return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
+                          };
+                          setEditForm({ ...editForm, telefone: formatTelefone(e.target.value) });
+                        }}
                         className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all"
                         placeholder="(00) 00000-0000"
                       />
@@ -952,9 +963,9 @@ export default function ResidentHome() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Entrada</label>
+                  <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ml-1 ${(!formData.date || getHorariosEntradaDisponiveis().length === 0) ? 'text-gray-300' : 'text-gray-400'}`}>Entrada</label>
                   <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Clock className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${(!formData.date || getHorariosEntradaDisponiveis().length === 0) ? 'text-gray-300' : 'text-gray-400'}`} />
                     <select
                       value={formData.startTime}
                       onChange={e => {
@@ -962,31 +973,27 @@ export default function ResidentHome() {
                         // Sempre que a entrada mudar, obriga a selecionar uma nova saída para garantir a consistência
                         setFormData({ ...formData, startTime: newStart, endTime: "" });
                       }}
-                      className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none"
+                      disabled={!!formData.date && getHorariosEntradaDisponiveis().length === 0}
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none ${((!!formData.date && getHorariosEntradaDisponiveis().length === 0)) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'}`}
                     >
                       <option value="" disabled>Selecione</option>
                       {getHorariosEntradaDisponiveis().map(h => (
                         <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
-                    {formData.date && getHorariosEntradaDisponiveis().length === 0 && (
-                      <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-top-1 duration-300">
-                        <p className="text-[11px] text-red-600 font-bold text-center leading-tight">Não há horários disponíveis nessa data</p>
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div>
-                  <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ml-1 ${!formData.startTime ? 'text-gray-300' : 'text-gray-400'}`}>Saída</label>
+                  <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ml-1 ${(!formData.startTime || (!!formData.date && getHorariosEntradaDisponiveis().length === 0)) ? 'text-gray-300' : 'text-gray-400'}`}>Saída</label>
                   <div className="relative">
-                    <Clock className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${!formData.startTime ? 'text-gray-300' : 'text-gray-400'}`} />
+                    <Clock className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${(!formData.startTime || (!!formData.date && getHorariosEntradaDisponiveis().length === 0)) ? 'text-gray-300' : 'text-gray-400'}`} />
                     <select
                       value={formData.endTime}
                       onChange={e => setFormData({ ...formData, endTime: e.target.value })}
-                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none ${!formData.startTime ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'}`}
-                      disabled={!formData.startTime || formData.startTime === ""}
+                      className={`w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm appearance-none ${(!formData.startTime || (!!formData.date && getHorariosEntradaDisponiveis().length === 0)) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white'}`}
+                      disabled={!formData.startTime || formData.startTime === "" || (!!formData.date && getHorariosEntradaDisponiveis().length === 0)}
                     >
-                      <option value="" disabled>Selecione após a entrada</option>
+                      <option value="" disabled>Selecione</option>
                       {formData.startTime && getHorariosSaidaDisponiveis().map(h => (
                         <option key={h} value={h}>{h}</option>
                       ))}
@@ -994,6 +1001,12 @@ export default function ResidentHome() {
                   </div>
                 </div>
               </div>
+
+              {formData.date && getHorariosEntradaDisponiveis().length === 0 && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <p className="text-xs text-red-700 font-bold text-center w-full leading-tight">Não há horários disponíveis nessa data</p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-6">
                 <button
