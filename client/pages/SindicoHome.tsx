@@ -84,6 +84,7 @@ export default function OwnerHome() {
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [filtroDataSindico, setFiltroDataSindico] = useState("");
+  const [filtroLocalSindico, setFiltroLocalSindico] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // ── Perfil ──
@@ -422,7 +423,11 @@ export default function OwnerHome() {
   // ─── Helpers ──────────────────────────────────────────────────────────
 
   function formatarData(data: string) {
-    return new Date(data + "T00:00:00").toLocaleDateString("pt-BR");
+    const d = new Date(data + "T00:00:00");
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const ano = d.getFullYear();
+    return `${dia}/${mes}/${ano}`;
   }
 
   function formatarHora(hora: string) {
@@ -714,11 +719,26 @@ export default function OwnerHome() {
                   Ver Histórico
                 </button>
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Filtrar por data:</label>
-                  <input
-                    type="date"
+                  <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Local:</label>
+                  <select
+                    value={filtroLocalSindico}
+                    onChange={e => setFiltroLocalSindico(e.target.value)}
+                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                  >
+                    <option value="">Todos</option>
+                    {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                  </select>
+                  {filtroLocalSindico && (
+                    <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Data:</label>
+                  <InputData
                     value={filtroDataSindico}
-                    onChange={e => setFiltroDataSindico(e.target.value)}
+                    onChange={(val) => setFiltroDataSindico(val)}
                     className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
                   />
                   {filtroDataSindico && (
@@ -735,6 +755,7 @@ export default function OwnerHome() {
                 const reservasFiltradas = reservas
                   .filter(r => (r.data as string) >= hojeString && r.status !== 'CANCELADA')
                   .filter(r => !filtroDataSindico || r.data === filtroDataSindico)
+                  .filter(r => !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico)
                   .sort((a, b) => {
                     const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
                     const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
@@ -742,7 +763,7 @@ export default function OwnerHome() {
                   });
 
                 if (reservasFiltradas.length === 0) {
-                  return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva encontrada.</p>;
+                  return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva programada{filtroDataSindico ? ' para esta data' : ''}{filtroLocalSindico ? ' neste local' : ''}.</p>;
                 }
 
                 return (
@@ -771,13 +792,21 @@ export default function OwnerHome() {
                               {r.status}
                             </span>
                           </td>
-                          <td className="px-4 py-4 min-w-[120px]">
-                            {r.status !== 'CANCELADA' && (r.data as string) >= hojeString && (
-                              <button onClick={() => { setSelectedReserva(r); setShowDeleteReservaModal(true); }}
-                                className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl transition-all active:scale-95">
-                                Cancelar
-                              </button>
-                            )}
+                          <td className="px-4 py-4 text-right">
+                            <div className="flex justify-end gap-2">
+                              {r.status !== 'CANCELADA' && !isReservaExpirada(r) && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedReserva(r);
+                                    setShowDeleteReservaModal(true);
+                                  }}
+                                  className="text-red-600 hover:bg-red-50 p-2 rounded-lg transition-colors border border-red-50"
+                                  title="Cancelar Reserva"
+                                >
+                                  <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -807,13 +836,24 @@ export default function OwnerHome() {
               </div>
 
               <div className="p-6 sm:p-8 overflow-y-auto">
-                <div className="flex justify-end mb-6">
+                <div className="flex justify-end mb-6 gap-4">
                   <div className="flex items-center gap-3">
-                    <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
-                    <input
-                      type="date"
+                    <label className="text-sm font-semibold text-gray-700">Local:</label>
+                    <select
+                      value={filtroLocalSindico}
+                      onChange={(e) => setFiltroLocalSindico(e.target.value)}
+                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      <option value="">Todos</option>
+                      {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                    </select>
+                    {filtroLocalSindico && <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-semibold text-gray-700">Data:</label>
+                    <InputData
                       value={filtroDataSindico}
-                      onChange={(e) => setFiltroDataSindico(e.target.value)}
+                      onChange={(val) => setFiltroDataSindico(val)}
                       className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                     {filtroDataSindico && <button onClick={() => setFiltroDataSindico("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
@@ -827,6 +867,7 @@ export default function OwnerHome() {
                       const reservasFiltradas = reservas
                         .filter(r => (r.data as string) < hojeString || r.status === 'CANCELADA')
                         .filter(r => !filtroDataSindico || r.data === filtroDataSindico)
+                        .filter(r => !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico)
                         .sort((a, b) => {
                           const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
                           const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
@@ -1007,7 +1048,7 @@ export default function OwnerHome() {
         </Modal>
       )}
 
-      {showDeleteReservaModal && selectedReserva && (
+        {showDeleteReservaModal && selectedReserva && (
         <Modal title="Cancelar Reserva?" onClose={() => setShowDeleteReservaModal(false)}>
           <p className="text-sm text-gray-600 mb-1">Morador: <strong>{selectedReserva.morador?.nome}</strong></p>
           <p className="text-sm text-gray-600 mb-4">Local: <strong>{selectedReserva.local?.nome}</strong> — {formatarData(selectedReserva.data as string)} às {formatarHora(selectedReserva.horaEntrada as string)}</p>
@@ -1181,6 +1222,26 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
         {children}
       </div>
     </div>
+  );
+}
+
+function isReservaExpirada(r: ReservaDTOResponse) {
+  if (!r.data) return false;
+  const agora = new Date();
+  const dateStr = (r.data as string) + "T" + (r.horaEntrada as string || "00:00:00");
+  const resDate = new Date(dateStr);
+  return resDate.getTime() < agora.getTime();
+}
+
+function InputData({ value, onChange, className, min }: { value: string, onChange: (v: string) => void, className?: string, min?: string }) {
+  return (
+    <input
+      type="date"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={className}
+      min={min}
+    />
   );
 }
 

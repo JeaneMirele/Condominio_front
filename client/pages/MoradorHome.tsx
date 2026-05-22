@@ -43,6 +43,7 @@ export default function ResidentHome() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedReservaForCancel, setSelectedReservaForCancel] = useState<ReservaDTOResponse | null>(null);
   const [filtroData, setFiltroData] = useState("");
+  const [filtroLocal, setFiltroLocal] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [formData, setFormData] = useState({ facilityId: "", date: "", startTime: "", endTime: "" });
   const [editForm, setEditForm] = useState({
@@ -357,6 +358,14 @@ export default function ResidentHome() {
 
   const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
 
+  const formatarData = (data: string) => {
+    const d = new Date(data + "T00:00:00");
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const ano = d.getFullYear();
+    return `${dia}/${mes}/${ano}`;
+  };
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="flex flex-col items-center gap-2">
@@ -550,11 +559,19 @@ export default function ResidentHome() {
                   <History className="w-4 h-4" />
                   Ver Histórico
                 </button>
+                <select
+                  value={filtroLocal}
+                  onChange={(e) => setFiltroLocal(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">Todos os Locais</option>
+                  {locaisDB.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                </select>
+                {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
                 <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
-                <input
-                  type="date"
+                <InputData
                   value={filtroData}
-                  onChange={(e) => setFiltroData(e.target.value)}
+                  onChange={(val) => setFiltroData(val)}
                   className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
@@ -566,6 +583,7 @@ export default function ResidentHome() {
                 {(() => {
                   const reservasFiltradas = reservas
                     .filter(r => !filtroData || r.data === filtroData)
+                    .filter(r => !filtroLocal || r.local?.id.toString() === filtroLocal)
                     .filter(r => (r.data as string) >= hojeString && r.status !== "CANCELADA")
                     .sort((a, b) => {
                       const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
@@ -576,7 +594,7 @@ export default function ResidentHome() {
                   if (reservasFiltradas.length === 0) {
                     return (
                       <div className="p-20 text-center">
-                        <p className="text-gray-400 italic">Nenhuma reserva futura encontrada{filtroData ? ' para esta data' : ''}.</p>
+                        <p className="text-gray-400 italic">Nenhuma reserva programada{filtroData ? ' para esta data' : ''}{filtroLocal ? ' neste local' : ''}.</p>
                         <button onClick={() => setActiveTab("locais")} className="mt-4 bg-accent hover:bg-accent/90 text-white font-medium text-sm px-6 py-2.5 rounded-lg transition-colors">
                           Ver Locais Disponíveis
                         </button>
@@ -603,7 +621,7 @@ export default function ResidentHome() {
                               <div className="text-[10px] text-gray-500 font-medium">{res.local?.localizacao}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                              {new Date((res.data as string) + "T00:00:00").toLocaleDateString("pt-BR")}
+                              {formatarData(res.data as string)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
                               {res.horaEntrada?.substring(0, 5)} - {res.horaSaida?.substring(0, 5)}
@@ -618,7 +636,7 @@ export default function ResidentHome() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               <div className="flex justify-end gap-2">
-                                {(res.status !== "CANCELADA" && (!res.data || res.data >= hojeString)) && (
+                                {res.status !== "CANCELADA" && !isReservaExpirada(res) && (
                                   <>
                                     <button onClick={() => prepararEdicao(res)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-50" title="Editar">
                                       <span className="text-xs font-bold uppercase tracking-wider">Editar</span>
@@ -666,13 +684,23 @@ export default function ResidentHome() {
               </div>
 
               <div className="p-6 sm:p-8 overflow-y-auto">
-                <div className="flex justify-end mb-6">
+                <div className="flex justify-end mb-6 gap-4">
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={filtroLocal}
+                      onChange={(e) => setFiltroLocal(e.target.value)}
+                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                    >
+                      <option value="">Todos os Locais</option>
+                      {locaisDB.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                    </select>
+                    {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                  </div>
                   <div className="flex items-center gap-3">
                     <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
-                    <input
-                      type="date"
+                    <InputData
                       value={filtroData}
-                      onChange={(e) => setFiltroData(e.target.value)}
+                      onChange={(val) => setFiltroData(val)}
                       className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                     {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
@@ -684,6 +712,7 @@ export default function ResidentHome() {
                     {(() => {
                       const reservasFiltradas = reservas
                         .filter(r => !filtroData || r.data === filtroData)
+                        .filter(r => !filtroLocal || r.local?.id.toString() === filtroLocal)
                         .filter(r => (r.data as string) < hojeString || r.status === "CANCELADA")
                         .sort((a, b) => {
                           const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
@@ -717,7 +746,7 @@ export default function ResidentHome() {
                                   <div className="text-[10px] text-gray-500 font-medium">{res.local?.localizacao}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                                  {new Date((res.data as string) + "T00:00:00").toLocaleDateString("pt-BR")}
+                                  {formatarData(res.data as string)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
                                   {res.horaEntrada?.substring(0, 5)} - {res.horaSaida?.substring(0, 5)}
@@ -951,11 +980,9 @@ export default function ResidentHome() {
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Data da Reserva</label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="date"
-                    min={hojeString}
+                  <InputData
                     value={formData.date}
-                    onChange={e => setFormData({ ...formData, date: e.target.value })}
+                    onChange={(val) => setFormData({ ...formData, date: val })}
                     className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm"
                   />
                 </div>
@@ -1036,7 +1063,7 @@ export default function ResidentHome() {
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Cancelar Reserva?</h3>
               <p className="text-sm text-gray-500 px-4">
-                Tem certeza que deseja cancelar sua reserva no(a) <strong>{selectedReservaForCancel.local?.nome}</strong> para o dia {new Date((selectedReservaForCancel.data as string) + "T00:00:00").toLocaleDateString("pt-BR")}?
+                Tem certeza que deseja cancelar sua reserva no(a) <strong>{selectedReservaForCancel.local?.nome}</strong> para o dia {formatarData(selectedReservaForCancel.data as string)}?
               </p>
             </div>
 
@@ -1074,3 +1101,104 @@ export default function ResidentHome() {
     </div>
   );
 }
+
+function isReservaExpirada(r: ReservaDTOResponse) {
+  if (!r.data) return false;
+  const agora = new Date();
+  const dateStr = (r.data as string) + "T" + (r.horaEntrada as string || "00:00:00");
+  const resDate = new Date(dateStr);
+  return resDate.getTime() < agora.getTime();
+}
+
+
+import React, { useRef } from 'react';
+
+interface InputDataProps {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+  min?: string;
+}
+
+function InputData({ value, onChange, className, min }: InputDataProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const formatDateToBRL = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleDisplayClick = () => {
+    if (inputRef.current) {
+      if ('showPicker' in HTMLInputElement.prototype) {
+        inputRef.current.showPicker();
+      } else {
+        inputRef.current.focus();
+      }
+    }
+  };
+
+  return (
+  <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+    <input
+      type="text"
+      value={formatDateToBRL(value)}
+      onClick={handleDisplayClick}
+      readOnly
+      placeholder="dd/mm/aaaa"
+      className={className}
+      style={{ 
+        cursor: 'pointer', 
+        width: '100%', 
+        paddingLeft: '12px',    // Garante um espaçamento no início do texto
+        paddingRight: '40px',   // Evita que o texto passe por baixo do ícone
+        textAlign: 'left'       // Força o alinhamento na esquerda (início do campo)
+      }}
+    />
+    
+    <svg
+      onClick={handleDisplayClick}
+      style={{
+        position: 'absolute',
+        right: '12px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        cursor: 'pointer',
+        width: '20px',
+        height: '20px',
+        color: '#6b7280',
+        pointerEvents: 'auto'
+      }}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+
+    <input
+      ref={inputRef}
+      type="date"
+      value={value}
+      min={min}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        opacity: 0,
+        cursor: 'pointer',
+        pointerEvents: 'none'
+      }}
+    />
+  </div>
+);
+}
+
+
+
+
