@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -171,12 +171,10 @@ export default function OwnerHome() {
       return;
     }
 
-
     const cleanCpf = userFormData.cpf.replace(/\D/g, "");
     const cleanTelefone = userFormData.telefone.replace(/\D/g, "");
 
     try {
-      // Garantir que não estamos em modo edição
       const resp = await criarUsuario({
         nome: userFormData.nome,
         email: userFormData.email,
@@ -211,7 +209,7 @@ export default function OwnerHome() {
       });
       setShowEditUserModal(false);
       await carregarTudo();
-      toast.success("Dados atualizados!");
+      toast.success("Dados updated!");
     } catch (err: any) {
       setFormError(err.message ?? "Erro ao atualizar.");
     }
@@ -366,7 +364,6 @@ export default function OwnerHome() {
         if (newPassword !== confirmPassword) throw new Error("As novas senhas não coincidem.");
       }
 
-      // 2. Atualizar Dados do Perfil
       const payload = {
         nome: editProfileForm.nome.trim(),
         email: usuarioLogado.email,
@@ -377,7 +374,6 @@ export default function OwnerHome() {
 
       await atualizarUsuario(usuarioLogado.id, payload as any);
 
-      // 3. Atualizar Senha se necessário
       if (trocandoSenha) {
         if (!currentPassword) throw new Error("Informe a senha atual para prosseguir.");
         await alterarSenha({
@@ -409,8 +405,7 @@ export default function OwnerHome() {
     setUploadingFoto(true);
     try {
       await uploadFotoPerfil(file);
-      toast.success("Foto atualizada com sucesso!");
-      // Atualiza o perfil sem recarregar tudo
+      toast.success("Foto updated com sucesso!");
       const novoPerfil = await getMeuPerfil();
       setUsuarioLogado(novoPerfil);
     } catch (err: any) {
@@ -493,7 +488,7 @@ export default function OwnerHome() {
             <p className="text-[10px] font-bold text-accent uppercase">{usuarioLogado?.roles?.[0] || 'Síndico'}</p>
           </div>
 
-          {/* Drawer Links - Simplified to only Profile as requested */}
+          {/* Drawer Links */}
           <nav className="flex-1 p-4 space-y-2 mt-4">
             <NavItem id="perfil" label="Configurações de Perfil" icon={Settings} />
           </nav>
@@ -528,7 +523,6 @@ export default function OwnerHome() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Somente botões globais se necessário, mas o usuário pediu para remover Novo Gerente */}
             </div>
           </div>
         </div>
@@ -558,101 +552,181 @@ export default function OwnerHome() {
           })}
         </div>
 
-        {activeTab === "overview" && (
+          {activeTab === "overview" && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                { label: "Gerentes", value: gerentes.length, color: "text-blue-500", bg: "bg-blue-50" },
-                { label: "Síndicos", value: sindicos.length, color: "text-purple-500", bg: "bg-purple-50" },
-                { label: "Áreas de Lazer", value: locais.length, color: "text-orange-500", bg: "bg-orange-50" },
-                { label: "Total de Reservas", value: reservas.length, color: "text-accent", bg: "bg-accent/5" },
-              ].map(({ label, value, color, bg }) => (
-                <div key={label} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
-                  <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center mb-3`}>
-                    <span className={`text-2xl font-black ${color}`}>{value}</span>
+            
+            {/* ── Seção de Filtros do Dashboard ── */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase">Filtrar por Área</label>
+                <select
+                  value={filtroLocalSindico}
+                  onChange={(e) => setFiltroLocalSindico(e.target.value)}
+                  className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">Todas as áreas</option>
+                  {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase">Filtrar por Mês</label>
+                <select
+                  value={filtroDataSindico}
+                  onChange={(e) => setFiltroDataSindico(e.target.value)}
+                  className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="">Todos os meses</option>
+                  {Array.from(new Set(reservas.map(r => r.data?.substring(0, 7)))).filter(Boolean).sort().map(mes => {
+                    const [ano, numMes] = mes.split('-');
+                    const mesesNome = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+                    return <option key={mes} value={mes}>{mesesNome[parseInt(numMes) - 1]} de {ano}</option>;
+                  })}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase">Limpar Filtros</label>
+                <button
+                  onClick={() => { setFiltroLocalSindico(""); setFiltroDataSindico(""); }}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold text-sm rounded-xl transition-colors"
+                >
+                  Resetar Filtros
+                </button>
+              </div>
+            </div>
+
+            {/* ── Lógica de Agrupamento das Métricas (Apenas Aprovadas) ── */}
+            {(() => {
+              const reservasFiltradasDashboard = reservas.filter(r => {
+                const isAprovada = r.status === 'APROVADA';
+                const matchesLocal = !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico;
+                const matchesMes = !filtroDataSindico || r.data?.startsWith(filtroDataSindico);
+                return isAprovada && matchesLocal && matchesMes;
+              });
+
+              const contagemLocais = reservasFiltradasDashboard.reduce((acc, r) => {
+                const nome = r.local?.nome || 'Desconhecido';
+                acc[nome] = (acc[nome] || 0) + 1;
+                return acc;
+              }, {} as Record<string, number>);
+
+              const dadosGraficoBarras = Object.entries(contagemLocais)
+                .map(([name, count]) => ({ name, Quantidade: count }))
+                .sort((a, b) => b.Quantidade - a.Quantidade);
+
+              const areaMaisReservada = dadosGraficoBarras[0]?.name || "—";
+              const qtdAreaMaisReservada = dadosGraficoBarras[0]?.Quantidade || 0;
+
+              const diasSemanaNome = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+              const contagemDias = reservasFiltradasDashboard.reduce((acc, r) => {
+                if (!r.data) return acc;
+                const diaSemana = new Date(r.data + "T00:00:00").getDay();
+                acc[diaSemana] = (acc[diaSemana] || 0) + 1;
+                return acc;
+              }, {} as Record<number, number>);
+
+              const diaMaisUsoIndex = Object.entries(contagemDias).sort((a, b) => b[1] - a[1])[0]?.[0];
+              const diaMaisUso = diaMaisUsoIndex !== undefined ? diasSemanaNome[parseInt(diaMaisUsoIndex)] : "—";
+
+              const contagemHorarios = reservasFiltradasDashboard.reduce((acc, r) => {
+                if (!r.horaEntrada) return acc;
+                const hora = r.horaEntrada.substring(0, 5);
+                acc[hora] = (acc[hora] || 0) + 1;
+                return acc;
+              }, {} as Record<string, number>);
+
+              const horarioMaisUso = Object.entries(contagemHorarios).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+
+              const dadosGraficoDias = diasSemanaNome.map((nome, index) => ({
+                name: nome.substring(0, 3),
+                Quantidade: contagemDias[index] || 0
+              }));
+
+              return (
+                <div className="space-y-8">
+                  
+                  {/* ── Cards de Indicadores Ajustados contra Quebras de Layout ── */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
+                      <div className="min-w-[48px] h-12 px-3 bg-accent/5 rounded-xl flex items-center justify-center mb-3">
+                        <span className="text-2xl font-black text-accent">{reservasFiltradasDashboard.length}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reservas Aprovadas</span>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
+                      <div className="min-w-[48px] min-h-[48px] py-2 px-4 bg-blue-50 rounded-xl flex items-center justify-center mb-3">
+                        <span className="text-sm font-black text-blue-600 whitespace-normal break-all line-clamp-2 max-w-[140px]">{areaMaisReservada}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mais Reservada ({qtdAreaMaisReservada})</span>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
+                      <div className="min-w-[48px] h-12 px-4 bg-purple-50 rounded-xl flex items-center justify-center mb-3">
+                        <span className="text-sm font-black text-purple-600 whitespace-nowrap">{diaMaisUso}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Dia de Pico</span>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
+                      <div className="min-w-[48px] h-12 px-4 bg-orange-50 rounded-xl flex items-center justify-center mb-3">
+                        <span className="text-base font-black text-orange-600 whitespace-nowrap">{horarioMaisUso}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Horário de Pico</span>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
+
+                  {/* ── Seção de Gráficos Analíticos ── */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    {/* Gráfico 1: Áreas Mais Reservadas */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Quantidade por Área de Lazer</h3>
+                      <div className="flex-1 min-h-[300px] relative">
+                        {dadosGraficoBarras.length === 0 ? (
+                          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm italic">Sem dados aprovados no filtro selecionado</div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={dadosGraficoBarras} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                              <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                              <Tooltip cursor={{ fill: '#F9FAFB' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                              <Bar dataKey="Quantidade" fill="#6366f1" radius={[8, 8, 0, 0]} barSize={32} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Gráfico 2: Uso por Dia da Semana */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Frequência por Dia da Semana</h3>
+                      <div className="flex-1 min-h-[300px] relative">
+                        {reservasFiltradasDashboard.length === 0 ? (
+                          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm italic">Sem dados aprovados no filtro selecionado</div>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={dadosGraficoDias} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                              <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                              <Tooltip cursor={{ fill: '#F9FAFB' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                              <Bar dataKey="Quantidade" fill="#10b981" radius={[8, 8, 0, 0]} barSize={32} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-              {/* STATUS GRÁFICO (PIE) */}
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Status das Reservas</h3>
-                <div className="flex-1 min-h-[300px] relative">
-                  {reservas.length === 0 ? (
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm italic">Sem dados de reserva</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Aprovadas', value: reservas.filter(r => r.status === 'APROVADA').length, color: '#10b981' },
-                            { name: 'Pendentes', value: reservas.filter(r => r.status === 'PENDENTE').length, color: '#f59e0b' },
-                            { name: 'Canceladas', value: reservas.filter(r => r.status === 'CANCELADA').length, color: '#ef4444' },
-                          ].filter(d => d.value > 0)}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={70}
-                          outerRadius={100}
-                          paddingAngle={8}
-                          dataKey="value"
-                        >
-                          {
-                            [
-                              { name: 'Aprovadas', value: reservas.filter(r => r.status === 'APROVADA').length, color: '#10b981' },
-                              { name: 'Pendentes', value: reservas.filter(r => r.status === 'PENDENTE').length, color: '#f59e0b' },
-                              { name: 'Canceladas', value: reservas.filter(r => r.status === 'CANCELADA').length, color: '#ef4444' },
-                            ].filter(d => d.value > 0).map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} className="outline-none" />
-                            ))
-                          }
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                          formatter={(value: number) => [`${value} Reservas`, 'Quantidade']}
-                        />
-                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
-
-              {/* LOCAIS MAIS RESERVADOS GRÁFICO (BAR) */}
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
-                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Reservas por Local</h3>
-                <div className="flex-1 min-h-[300px] relative">
-                  {reservas.length === 0 ? (
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm italic">Sem dados de reserva</div>
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={Object.entries(reservas.reduce((acc, r) => {
-                          const localName = r.local?.nome || 'Desconhecido';
-                          acc[localName] = (acc[localName] || 0) + 1;
-                          return acc;
-                        }, {} as Record<string, number>)).map(([name, count]) => ({ name, Quantidade: count }))}
-                        margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
-                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                        <Tooltip cursor={{ fill: '#F9FAFB' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                        <Bar dataKey="Quantidade" fill="#6366f1" radius={[8, 8, 0, 0]} barSize={32} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
-
-            </div>
+              );
+            })()}
           </div>
         )}
+        
 
         {activeTab === "managers" && (
           <div className="space-y-6">
@@ -836,27 +910,34 @@ export default function OwnerHome() {
               </div>
 
               <div className="p-6 sm:p-8 overflow-y-auto">
-                <div className="flex justify-end mb-6 gap-4">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-semibold text-gray-700">Local:</label>
-                    <select
-                      value={filtroLocalSindico}
-                      onChange={(e) => setFiltroLocalSindico(e.target.value)}
-                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
-                    >
-                      <option value="">Todos</option>
-                      {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
-                    </select>
-                    {filtroLocalSindico && <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                
+                {/* Filtro do Histórico reestruturado com Grid contra quebras */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 items-center">
+                  <div className="flex items-center gap-2 w-full flex-nowrap">
+                    <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Local:</label>
+                    <div className="flex-1">
+                      <select
+                        value={filtroLocalSindico}
+                        onChange={(e) => setFiltroLocalSindico(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                      >
+                        <option value="">Todos</option>
+                        {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                      </select>
+                    </div>
+                    {filtroLocalSindico && <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-gray-500 hover:text-red-500 whitespace-nowrap">Limpar</button>}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-semibold text-gray-700">Data:</label>
-                    <InputData
-                      value={filtroDataSindico}
-                      onChange={(val) => setFiltroDataSindico(val)}
-                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
-                    />
-                    {filtroDataSindico && <button onClick={() => setFiltroDataSindico("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                  
+                  <div className="flex items-center gap-2 w-full flex-nowrap">
+                    <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Data:</label>
+                    <div className="flex-1">
+                      <InputData
+                        value={filtroDataSindico}
+                        onChange={(val) => setFiltroDataSindico(val)}
+                        className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                      />
+                    </div>
+                    {filtroDataSindico && <button onClick={() => setFiltroDataSindico("")} className="text-xs text-gray-500 hover:text-red-500 whitespace-nowrap">Limpar</button>}
                   </div>
                 </div>
 
@@ -937,7 +1018,6 @@ export default function OwnerHome() {
                 locais.map((l) => (
                   <div key={l.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:border-accent hover:shadow-md transition-all flex flex-col">
                     <div className="w-full h-48 bg-gray-100 relative">
-                      {/* Fallback pattern to user defaults properly mapped in DB fotoUrl */}
                       <img
                         src={(() => {
                           const url = l.fotoUrl || (l as any).foto;
@@ -1048,7 +1128,7 @@ export default function OwnerHome() {
         </Modal>
       )}
 
-        {showDeleteReservaModal && selectedReserva && (
+      {showDeleteReservaModal && selectedReserva && (
         <Modal title="Cancelar Reserva?" onClose={() => setShowDeleteReservaModal(false)}>
           <p className="text-sm text-gray-600 mb-1">Morador: <strong>{selectedReserva.morador?.nome}</strong></p>
           <p className="text-sm text-gray-600 mb-4">Local: <strong>{selectedReserva.local?.nome}</strong> — {formatarData(selectedReserva.data as string)} às {formatarHora(selectedReserva.horaEntrada as string)}</p>
@@ -1058,7 +1138,6 @@ export default function OwnerHome() {
           </div>
         </Modal>
       )}
-
 
       {/* Perfil Tab */}
       {activeTab === "perfil" && (
@@ -1116,7 +1195,7 @@ export default function OwnerHome() {
                         if (truncated.length <= 10) return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 6)}-${truncated.slice(6)}`;
                         return `(${truncated.slice(0, 2)}) ${truncated.slice(2, 7)}-${truncated.slice(7)}`;
                       };
-                      setEditProfileForm({ ...editProfileForm, telefone: formatTelefone(e.target.value) });
+                      setEditProfileForm({ ...editProfileForm, telefone: formatTelefone(val) });
                     }} className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-semibold focus:border-accent focus:ring-4 focus:ring-accent/5 outline-none shadow-sm transition-all" />
                   </div>
                 </div>
@@ -1234,14 +1313,81 @@ function isReservaExpirada(r: ReservaDTOResponse) {
 }
 
 function InputData({ value, onChange, className, min }: { value: string, onChange: (v: string) => void, className?: string, min?: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const formatDateToBRL = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleDisplayClick = () => {
+    if (inputRef.current) {
+      if ('showPicker' in HTMLInputElement.prototype) {
+        inputRef.current.showPicker();
+      } else {
+        inputRef.current.focus();
+      }
+    }
+  };
+
   return (
-    <input
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={className}
-      min={min}
-    />
+    <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+      <input
+        type="text"
+        value={formatDateToBRL(value)}
+        onClick={handleDisplayClick}
+        readOnly
+        placeholder="dd/mm/aaaa"
+        className={className}
+        style={{ 
+          cursor: 'pointer', 
+          width: '100%', 
+          paddingLeft: '12px',
+          paddingRight: '40px',
+          textAlign: 'left'
+        }}
+      />
+      
+      <svg
+        onClick={handleDisplayClick}
+        style={{
+          position: 'absolute',
+          right: '12px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          cursor: 'pointer',
+          width: '20px',
+          height: '20px',
+          color: '#6b7280',
+          pointerEvents: 'auto'
+        }}
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        min={min}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          opacity: 0,
+          cursor: 'pointer',
+          pointerEvents: 'none'
+        }}
+      />
+    </div>
   );
 }
 
@@ -1387,11 +1533,11 @@ function FormLocal({ data, onChange, error, onCancel, onSubmit, submitLabel }: {
       </div>
       <div>
         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Imagem do Local</label>
-        {data.fotoUrl && !data.foto && (
+        {(data as any).fotoUrl && !data.foto && (
           <div className="mb-3 relative w-full h-32 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
             <img
               src={(() => {
-                const url = data.fotoUrl || (data as any).foto;
+                const url = (data as any).fotoUrl || (data as any).foto;
                 if (!url || typeof url !== 'string') return "/icone.png";
                 if (url.startsWith('http')) return url;
                 let path = url.startsWith('/') ? url : '/' + url;

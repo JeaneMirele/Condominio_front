@@ -80,15 +80,12 @@ export default function ResidentHome() {
       getHorariosDoLocal(Number(formData.facilityId), formData.date)
         .then(res => {
           if (Array.isArray(res)) {
-            // O backend retorna List<Object[]> onde cada array tem [horaEntrada, horaSaida]
-            // Vamos extrair todas as horas de início para marcar como ocupadas no frontend
             const ocupados: string[] = [];
             res.forEach(item => {
               if (Array.isArray(item) && typeof item[0] === 'string') {
                 const start = item[0].substring(0, 5);
                 const end = item[1].substring(0, 5);
 
-                // Adiciona todas as horas entre início e fim (exclusivo no fim)
                 const hStart = parseInt(start.split(":")[0]);
                 const hEnd = parseInt(end.split(":")[0]);
                 for (let h = hStart; h < hEnd; h++) {
@@ -111,7 +108,6 @@ export default function ResidentHome() {
       setUsuarioLogado(perfil);
       setLocaisDB(locList || []);
 
-      // Filtro mais robusto para evitar problemas de tipo (String vs Number)
       const minhasReservas = Array.isArray(resList)
         ? resList.filter((r) => String(r?.morador?.id) === String(perfil?.id))
         : [];
@@ -167,7 +163,6 @@ export default function ResidentHome() {
 
     setUploadingFoto(true);
     try {
-
       await uploadFotoPerfil(arquivo);
       toast.success("Foto atualizada com sucesso!");
       carregarDados();
@@ -210,10 +205,8 @@ export default function ResidentHome() {
     );
 
     return todosHorarios.filter(horaStr => {
-      // Se a data selecionada for menor que hoje, não permite nenhum horário
       if (formData.date && formData.date < hojeString) return false;
 
-      // Verifica se a data é hoje para não mostrar horários que já passaram
       if (formData.date === hojeString) {
         const agora = new Date();
         const h = agora.getHours().toString().padStart(2, '0');
@@ -224,10 +217,8 @@ export default function ResidentHome() {
         if (timeToMins(horaStr) <= timeToMins(horaAtual)) return false;
       }
 
-      // 1. Verifica se está na lista de horários ocupados do backend (nova API)
       if (horariosOcupadosBackend.includes(horaStr)) return false;
 
-      // 2. Fallback: Verifica com as reservas em cache
       return !reservasDoDia.some(r => {
         const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
         const resEnd = (r.horaSaida || "23:59:59").substring(0, 5);
@@ -252,10 +243,8 @@ export default function ResidentHome() {
 
     const timeToMins = (t: string) => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1] || "0");
 
-    // O máximo possível é o fechamento do local
     let maxEnd = todosHorarios[todosHorarios.length - 1];
 
-    // Verifica a próxima reserva para limitar o horário de saída
     reservasDoDia.forEach(r => {
       const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
       if (timeToMins(resStart) > timeToMins(start) && timeToMins(resStart) < timeToMins(maxEnd)) {
@@ -263,7 +252,6 @@ export default function ResidentHome() {
       }
     });
 
-    // Também verifica as ocupações do backend
     horariosOcupadosBackend.forEach(horaStr => {
       if (timeToMins(horaStr) > timeToMins(start) && timeToMins(horaStr) < timeToMins(maxEnd)) {
         maxEnd = horaStr;
@@ -303,7 +291,6 @@ export default function ResidentHome() {
     setSavingProfile(true);
     setEditError("");
     try {
-      // 1. Validar troca de senha se houver algo preenchido
       const trocandoSenha = editForm.novaSenha || editForm.senhaAtual || editForm.confirmarSenha;
       if (trocandoSenha) {
         if (!editForm.senhaAtual) throw new Error("Informe a senha atual para prosseguir.");
@@ -311,7 +298,6 @@ export default function ResidentHome() {
         if (editForm.novaSenha !== editForm.confirmarSenha) throw new Error("As novas senhas não coincidem.");
       }
 
-      // 2. Atualizar Dados do Perfil
       const payload = {
         nome: editForm.nome.trim(),
         email: editForm.email.trim(),
@@ -322,7 +308,6 @@ export default function ResidentHome() {
 
       await atualizarUsuario(usuarioLogado.id, payload);
 
-      // 3. Atualizar Senha se necessário
       if (trocandoSenha) {
         await alterarSenha({
           senhaAtual: editForm.senhaAtual,
@@ -331,7 +316,7 @@ export default function ResidentHome() {
         setEditForm(prev => ({ ...prev, senhaAtual: "", novaSenha: "", confirmarSenha: "" }));
       }
 
-      toast.success("Perfil e segurança atualizados!");
+      toast.success("Perfil e segurança updated!");
       setShowSidebar(false);
       carregarDados();
     } catch (err: any) {
@@ -378,15 +363,12 @@ export default function ResidentHome() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
 
-      {/* Sidebar / Drawer Overlay */}
       {showSidebar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] transition-opacity animate-in fade-in duration-300" onClick={() => setShowSidebar(false)} />
       )}
 
-      {/* Sidebar / Drawer */}
       <aside className={`fixed top-0 left-0 h-full w-80 bg-white z-[70] shadow-2xl transition-transform duration-300 transform ${showSidebar ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex flex-col h-full">
-          {/* Drawer Header */}
           <div className="p-8 border-b border-gray-100 flex flex-col items-center text-center bg-gray-50/50">
             <button onClick={() => setShowSidebar(false)} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors">
               <X className="w-6 h-6" />
@@ -410,12 +392,10 @@ export default function ResidentHome() {
             <p className="text-[10px] font-bold text-accent uppercase">{usuarioLogado?.roles?.[0] || 'Morador'}</p>
           </div>
 
-          {/* Drawer Links */}
           <nav className="flex-1 p-4 space-y-2 mt-4">
             <NavItem id="perfil" label="Alterações de Perfil" icon={Settings} />
           </nav>
 
-          {/* Drawer Footer */}
           <div className="p-4 border-t border-gray-100 mt-auto">
             <button
               onClick={handleSignOut}
@@ -428,7 +408,6 @@ export default function ResidentHome() {
         </div>
       </aside>
 
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6 lg:px-8 sm:py-5">
           <div className="flex items-center justify-between gap-3">
@@ -446,10 +425,8 @@ export default function ResidentHome() {
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* Horizontal Navigation (Fallback for quick access) */}
         {activeTab !== "perfil" && (
           <div className="flex gap-2 mb-10 border-b border-gray-200 overflow-x-auto pb-px">
             {(["locais", "reservas"] as ActiveTab[]).map((tab) => {
@@ -549,32 +526,40 @@ export default function ResidentHome() {
 
         {activeTab === "reservas" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
               <h2 className="text-xl font-bold text-gray-900">Minhas Reservas</h2>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-4">
                 <button
                   onClick={() => setShowHistoryModal(true)}
-                  className="text-xs font-bold py-2 px-4 rounded-xl transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2"
+                  className="text-xs font-bold py-2.5 px-4 rounded-xl transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2 h-10 shadow-sm"
                 >
                   <History className="w-4 h-4" />
                   Ver Histórico
                 </button>
-                <select
-                  value={filtroLocal}
-                  onChange={(e) => setFiltroLocal(e.target.value)}
-                  className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
-                >
-                  <option value="">Todos os Locais</option>
-                  {locaisDB.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
-                </select>
-                {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
-                <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
-                <InputData
-                  value={filtroData}
-                  onChange={(val) => setFiltroData(val)}
-                  className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                
+                <div className="flex items-center gap-2 h-10">
+                  <select
+                    value={filtroLocal}
+                    onChange={(e) => setFiltroLocal(e.target.value)}
+                    className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                  >
+                    <option value="">Todos os Locais</option>
+                    {locaisDB.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                  </select>
+                  {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
+                </div>
+
+                <div className="flex items-center gap-2 h-10">
+                  <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Filtrar por data:</span>
+                  <div className="w-40 h-full">
+                    <InputData
+                      value={filtroData}
+                      onChange={(val) => setFiltroData(val)}
+                      className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                    />
+                  </div>
+                  {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
+                </div>
               </div>
             </div>
 
@@ -666,7 +651,6 @@ export default function ResidentHome() {
           </div>
         )}
 
-        {/* Modal de Histórico */}
         {showHistoryModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
@@ -684,26 +668,28 @@ export default function ResidentHome() {
               </div>
 
               <div className="p-6 sm:p-8 overflow-y-auto">
-                <div className="flex justify-end mb-6 gap-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap justify-end mb-6 gap-4">
+                  <div className="flex items-center gap-3 h-10">
                     <select
                       value={filtroLocal}
                       onChange={(e) => setFiltroLocal(e.target.value)}
-                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
+                      className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                     >
                       <option value="">Todos os Locais</option>
                       {locaisDB.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
                     </select>
-                    {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                    {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-semibold text-gray-700">Filtrar por data:</label>
-                    <InputData
-                      value={filtroData}
-                      onChange={(val) => setFiltroData(val)}
-                      className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent"
-                    />
-                    {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-gray-500 hover:text-red-500">Limpar</button>}
+                  <div className="flex items-center gap-3 h-10">
+                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Filtrar por data:</span>
+                    <div className="w-40 h-full">
+                      <InputData
+                        value={filtroData}
+                        onChange={(val) => setFiltroData(val)}
+                        className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                      />
+                    </div>
+                    {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                   </div>
                 </div>
 
@@ -753,9 +739,9 @@ export default function ResidentHome() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest
-                                  ${res.status === "APROVADA" ? "bg-gray-100 text-gray-700"
-                                      : res.status === "CANCELADA" ? "bg-red-50 text-red-700"
-                                        : "bg-gray-100 text-gray-700"}`}>
+                                  ${res.status === "APROVADA" ? "bg-green-100 text-green-700"
+                                      : res.status === "CANCELADA" ? "bg-red-100 text-red-700"
+                                        : "bg-yellow-100 text-yellow-700"}`}>
                                     {res.status}
                                   </span>
                                 </td>
@@ -979,7 +965,7 @@ export default function ResidentHome() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Data da Reserva</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                   <InputData
                     value={formData.date}
                     onChange={(val) => setFormData({ ...formData, date: val })}
@@ -997,7 +983,6 @@ export default function ResidentHome() {
                       value={formData.startTime}
                       onChange={e => {
                         const newStart = e.target.value;
-                        // Sempre que a entrada mudar, obriga a selecionar uma nova saída para garantir a consistência
                         setFormData({ ...formData, startTime: newStart, endTime: "" });
                       }}
                       disabled={!!formData.date && getHorariosEntradaDisponiveis().length === 0}
@@ -1110,7 +1095,6 @@ function isReservaExpirada(r: ReservaDTOResponse) {
   return resDate.getTime() < agora.getTime();
 }
 
-
 import React, { useRef } from 'react';
 
 interface InputDataProps {
@@ -1129,7 +1113,8 @@ function InputData({ value, onChange, className, min }: InputDataProps) {
     return `${day}/${month}/${year}`;
   };
 
-  const handleDisplayClick = () => {
+  const handleDisplayClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     if (inputRef.current) {
       if ('showPicker' in HTMLInputElement.prototype) {
         inputRef.current.showPicker();
@@ -1140,65 +1125,35 @@ function InputData({ value, onChange, className, min }: InputDataProps) {
   };
 
   return (
-  <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-    <input
-      type="text"
-      value={formatDateToBRL(value)}
-      onClick={handleDisplayClick}
-      readOnly
-      placeholder="dd/mm/aaaa"
-      className={className}
-      style={{ 
-        cursor: 'pointer', 
-        width: '100%', 
-        paddingLeft: '12px',    // Garante um espaçamento no início do texto
-        paddingRight: '40px',   // Evita que o texto passe por baixo do ícone
-        textAlign: 'left'       // Força o alinhamento na esquerda (início do campo)
-      }}
-    />
-    
-    <svg
-      onClick={handleDisplayClick}
-      style={{
-        position: 'absolute',
-        right: '12px',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        cursor: 'pointer',
-        width: '20px',
-        height: '20px',
-        color: '#6b7280',
-        pointerEvents: 'auto'
-      }}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-    </svg>
+    <div className="relative w-full h-full inline-block">
+      <input
+        type="text"
+        value={formatDateToBRL(value)}
+        onClick={handleDisplayClick}
+        readOnly
+        placeholder="dd/mm/aaaa"
+        className={`${className} w-full h-full pl-3 pr-10 cursor-pointer text-left`}
+      />
+      
+      <svg
+        onClick={handleDisplayClick}
+        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 cursor-pointer pointer-events-auto"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
 
-    <input
-      ref={inputRef}
-      type="date"
-      value={value}
-      min={min}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        opacity: 0,
-        cursor: 'pointer',
-        pointerEvents: 'none'
-      }}
-    />
-  </div>
-);
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        min={min}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer pointer-events-none"
+      />
+    </div>
+  );
 }
-
-
-
-
