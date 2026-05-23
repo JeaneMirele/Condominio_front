@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,7 @@ import {
   getHorariosDoLocal,
   BASE_URL
 } from "@/services/api";
-import { Users, Clock, Calendar, Menu, X, LogOut, Settings, User, Camera, Lock, ChevronLeft, Eye, EyeOff, History } from "lucide-react";
+import { Users, Clock, Calendar, Menu, X, LogOut, Settings, Camera, Eye, EyeOff, History } from "lucide-react";
 import type { UsuarioDTOResponse, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 
 type ActiveTab = "locais" | "reservas" | "perfil";
@@ -31,14 +31,11 @@ export default function ResidentHome() {
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showEditReservation, setShowEditReservation] = useState(false);
 
-  const [senhaAtual, setSenhaAtual] = useState("");
-  const [loadingSenha, setLoadingSenha] = useState(false);
   const [locaisDB, setLocaisDB] = useState<LocalDTOResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const [showMakeReservation, setShowMakeReservation] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [selectedReservaForCancel, setSelectedReservaForCancel] = useState<ReservaDTOResponse | null>(null);
@@ -66,9 +63,6 @@ export default function ResidentHome() {
 
   const [editError, setEditError] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordError, setPasswordError] = useState("");
   const [showSenhaAtual, setShowSenhaAtual] = useState(false);
   const [showNovaSenha, setShowNovaSenha] = useState(false);
   const [showConfirmarSenha, setShowConfirmarSenha] = useState(false);
@@ -96,7 +90,7 @@ export default function ResidentHome() {
             setHorariosOcupadosBackend(ocupados);
           }
         })
-        .catch(err => console.error("Erro ao buscar horários ocupados do backend:", err));
+        .catch(err => console.error("Erro", err));
     } else {
       setHorariosOcupadosBackend([]);
     }
@@ -126,9 +120,9 @@ export default function ResidentHome() {
     setSelectedReserva(res);
     setFormData({
       facilityId: res.local.id.toString(),
-      date: res.data,
-      startTime: res.horaEntrada.substring(0, 5),
-      endTime: res.horaSaida.substring(0, 5)
+      date: res.data as string,
+      startTime: (res.horaEntrada as string).substring(0, 5),
+      endTime: (res.horaSaida as string).substring(0, 5)
     });
     setShowEditReservation(true);
   }
@@ -136,9 +130,9 @@ export default function ResidentHome() {
   const handleUpdateReservation = async () => {
     if (!selectedReserva) return;
     try {
-      await atualizarReserva(selectedReserva.id, {
+      await atualizarReserva(selectedReserva.id!, {
         id_local: parseInt(formData.facilityId),
-        id_morador: usuarioLogado!.id,
+        id_morador: usuarioLogado!.id!,
         data: formData.date,
         horaEntrada: formData.startTime + ":00",
         horaSaida: formData.endTime + ":00",
@@ -220,8 +214,8 @@ export default function ResidentHome() {
       if (horariosOcupadosBackend.includes(horaStr)) return false;
 
       return !reservasDoDia.some(r => {
-        const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
-        const resEnd = (r.horaSaida || "23:59:59").substring(0, 5);
+        const resStart = (r.horaEntrada as string || "00:00:00").substring(0, 5);
+        const resEnd = (r.horaSaida as string || "23:59:59").substring(0, 5);
         
         const timeToMins = (t: string) => parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]);
         const strMins = timeToMins(horaStr);
@@ -246,7 +240,7 @@ export default function ResidentHome() {
     let maxEnd = todosHorarios[todosHorarios.length - 1];
 
     reservasDoDia.forEach(r => {
-      const resStart = (r.horaEntrada || "00:00:00").substring(0, 5);
+      const resStart = (r.horaEntrada as string || "00:00:00").substring(0, 5);
       if (timeToMins(resStart) > timeToMins(start) && timeToMins(resStart) < timeToMins(maxEnd)) {
         maxEnd = resStart;
       }
@@ -272,7 +266,7 @@ export default function ResidentHome() {
     try {
       await criarReserva({
         id_local: parseInt(formData.facilityId),
-        id_morador: usuarioLogado!.id,
+        id_morador: usuarioLogado!.id!,
         data: formData.date,
         horaEntrada: formData.startTime + ":00",
         horaSaida: formData.endTime + ":00",
@@ -505,7 +499,7 @@ export default function ResidentHome() {
                     <button
                       onClick={() => {
                         setFormData({
-                          facilityId: local.id.toString(),
+                          facilityId: local.id!.toString(),
                           date: "",
                           startTime: "",
                           endTime: ""
@@ -544,7 +538,7 @@ export default function ResidentHome() {
                     className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                   >
                     <option value="">Todos os Locais</option>
-                    {locaisDB.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                    {locaisDB.map(l => <option key={l.id} value={l.id!.toString()}>{l.nome}</option>)}
                   </select>
                   {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                 </div>
@@ -555,7 +549,7 @@ export default function ResidentHome() {
                     <InputData
                       value={filtroData}
                       onChange={(val) => setFiltroData(val)}
-                      className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                      className="h-full w-full bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                     />
                   </div>
                   {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
@@ -568,7 +562,7 @@ export default function ResidentHome() {
                 {(() => {
                   const reservasFiltradas = reservas
                     .filter(r => !filtroData || r.data === filtroData)
-                    .filter(r => !filtroLocal || r.local?.id.toString() === filtroLocal)
+                    .filter(r => !filtroLocal || r.local?.id!.toString() === filtroLocal)
                     .filter(r => (r.data as string) >= hojeString && r.status !== "CANCELADA")
                     .sort((a, b) => {
                       const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
@@ -609,7 +603,7 @@ export default function ResidentHome() {
                               {formatarData(res.data as string)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                              {res.horaEntrada?.substring(0, 5)} - {res.horaSaida?.substring(0, 5)}
+                              {(res.horaEntrada as string)?.substring(0, 5)} - {(res.horaSaida as string)?.substring(0, 5)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest
@@ -623,19 +617,23 @@ export default function ResidentHome() {
                               <div className="flex justify-end gap-2">
                                 {res.status !== "CANCELADA" && !isReservaExpirada(res) && (
                                   <>
-                                    <button onClick={() => prepararEdicao(res)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-50" title="Editar">
-                                      <span className="text-xs font-bold uppercase tracking-wider">Editar</span>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        setSelectedReservaForCancel(res);
-                                        setShowCancelModal(true);
-                                      }}
-                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-50"
-                                      title="Cancelar"
-                                    >
-                                      <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
-                                    </button>
+                                    {podeEditar(res) && (
+                                      <button onClick={() => prepararEdicao(res)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-50" title="Editar">
+                                        <span className="text-xs font-bold uppercase tracking-wider">Editar</span>
+                                      </button>
+                                    )}
+                                    {podeCancelar(res) && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedReservaForCancel(res);
+                                          setShowCancelModal(true);
+                                        }}
+                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-50"
+                                        title="Cancelar"
+                                      >
+                                        <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
+                                      </button>
+                                    )}
                                   </>
                                 )}
                               </div>
@@ -676,7 +674,7 @@ export default function ResidentHome() {
                       className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                     >
                       <option value="">Todos os Locais</option>
-                      {locaisDB.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                      {locaisDB.map(l => <option key={l.id} value={l.id!.toString()}>{l.nome}</option>)}
                     </select>
                     {filtroLocal && <button onClick={() => setFiltroLocal("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                   </div>
@@ -686,7 +684,7 @@ export default function ResidentHome() {
                       <InputData
                         value={filtroData}
                         onChange={(val) => setFiltroData(val)}
-                        className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                        className="h-full w-full bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                       />
                     </div>
                     {filtroData && <button onClick={() => setFiltroData("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
@@ -698,7 +696,7 @@ export default function ResidentHome() {
                     {(() => {
                       const reservasFiltradas = reservas
                         .filter(r => !filtroData || r.data === filtroData)
-                        .filter(r => !filtroLocal || r.local?.id.toString() === filtroLocal)
+                        .filter(r => !filtroLocal || r.local?.id!.toString() === filtroLocal)
                         .filter(r => (r.data as string) < hojeString || r.status === "CANCELADA")
                         .sort((a, b) => {
                           const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
@@ -735,7 +733,7 @@ export default function ResidentHome() {
                                   {formatarData(res.data as string)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                                  {res.horaEntrada?.substring(0, 5)} - {res.horaSaida?.substring(0, 5)}
+                                  {(res.horaEntrada as string)?.substring(0, 5)} - {(res.horaSaida as string)?.substring(0, 5)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest
@@ -957,7 +955,7 @@ export default function ResidentHome() {
                 </select>
                 {formData.facilityId && (
                   <p className="text-[10px] text-accent font-bold mt-1">
-                    {locaisDB.find(l => l.id.toString() === formData.facilityId)?.horarioInicio.substring(0, 5)} às {locaisDB.find(l => l.id.toString() === formData.facilityId)?.horarioFim.substring(0, 5)}
+                    {locaisDB.find(l => l.id!.toString() === formData.facilityId)?.horarioInicio.substring(0, 5)} às {locaisDB.find(l => l.id!.toString() === formData.facilityId)?.horarioFim.substring(0, 5)}
                   </p>
                 )}
               </div>
@@ -965,12 +963,13 @@ export default function ResidentHome() {
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Data da Reserva</label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
                   <InputData
                     value={formData.date}
+                    min={hojeString}
                     onChange={(val) => setFormData({ ...formData, date: val })}
-                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm pl-10"
                   />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
 
@@ -1095,7 +1094,24 @@ function isReservaExpirada(r: ReservaDTOResponse) {
   return resDate.getTime() < agora.getTime();
 }
 
-import React, { useRef } from 'react';
+function podeEditar(r: ReservaDTOResponse) {
+  if (!r.data) return false;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const dataRes = new Date(r.data as string + "T00:00:00");
+  const diffTime = dataRes.getTime() - hoje.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays >= 7;
+}
+
+function podeCancelar(r: ReservaDTOResponse) {
+  if (!r.data) return false;
+  const agora = new Date();
+  const dataHoraRes = new Date(`${r.data}T${r.horaEntrada || "00:00:00"}`);
+  const diffTime = dataHoraRes.getTime() - agora.getTime();
+  const diffHours = diffTime / (1000 * 60 * 60);
+  return diffHours >= 24;
+}
 
 interface InputDataProps {
   value: string;
@@ -1104,13 +1120,16 @@ interface InputDataProps {
   min?: string;
 }
 
-function InputData({ value, onChange, className, min }: InputDataProps) {
+function InputData({ value, onChange, className, min, isMonthSelect = false }: { value: string, onChange: (v: string) => void, className?: string, min?: string, isMonthSelect?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const formatDateToBRL = (dateStr: string) => {
     if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
+    const parts = dateStr.split('-');
+    if (parts.length === 2) {
+      return `${parts[1]}/${parts[0]}`;
+    }
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
   };
 
   const handleDisplayClick = (e: React.MouseEvent) => {
@@ -1131,13 +1150,13 @@ function InputData({ value, onChange, className, min }: InputDataProps) {
         value={formatDateToBRL(value)}
         onClick={handleDisplayClick}
         readOnly
-        placeholder="dd/mm/aaaa"
-        className={`${className} w-full h-full pl-3 pr-10 cursor-pointer text-left`}
+        placeholder={isMonthSelect ? "mm/aaaa" : "dd/mm/yyyy"}
+        className={`${className} w-full h-full pl-3 pr-10 cursor-pointer text-left relative z-0`}
       />
       
       <svg
         onClick={handleDisplayClick}
-        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 cursor-pointer pointer-events-auto"
+        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 cursor-pointer z-10"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -1148,12 +1167,41 @@ function InputData({ value, onChange, className, min }: InputDataProps) {
 
       <input
         ref={inputRef}
-        type="date"
+        type={isMonthSelect ? "month" : "date"}
         value={value}
         min={min}
         onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer pointer-events-none"
+        className="absolute inset-0 w-full h-full cursor-pointer pointer-events-none z-10 opacity-0"
+        style={{ opacity: 0, color: "transparent", background: "transparent" }}
       />
+
+      <style>
+        {`
+          input[type="date"]::-webkit-calendar-picker-indicator,
+          input[type="month"]::-webkit-calendar-picker-indicator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+          }
+          input[type="date"]::-webkit-datetime-edit,
+          input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+          input[type="date"]::-webkit-datetime-edit-text,
+          input[type="date"]::-webkit-datetime-edit-month-field,
+          input[type="date"]::-webkit-datetime-edit-day-field,
+          input[type="date"]::-webkit-datetime-edit-year-field,
+          input[type="month"]::-webkit-datetime-edit,
+          input[type="month"]::-webkit-datetime-edit-fields-wrapper,
+          input[type="month"]::-webkit-datetime-edit-text,
+          input[type="month"]::-webkit-datetime-edit-month-field,
+          input[type="month"]::-webkit-datetime-edit-year-field {
+            color: transparent;
+          }
+        `}
+      </style>
     </div>
   );
 }
