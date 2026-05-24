@@ -969,10 +969,8 @@ export default function ResidentHome() {
                     onChange={(val) => setFormData({ ...formData, date: val })}
                     className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-accent outline-none transition-all shadow-sm pl-10"
                   />
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ml-1 ${(!formData.date || getHorariosEntradaDisponiveis().length === 0) ? 'text-gray-300' : 'text-gray-400'}`}>Entrada</label>
