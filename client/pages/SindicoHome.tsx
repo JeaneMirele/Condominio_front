@@ -74,6 +74,8 @@ export default function OwnerHome() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [filtroDataSindico, setFiltroDataSindico] = useState("");
   const [filtroLocalSindico, setFiltroLocalSindico] = useState("");
+  const [filtroDataHistorico, setFiltroDataHistorico] = useState("");
+  const [filtroLocalHistorico, setFiltroLocalHistorico] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -734,7 +736,10 @@ export default function OwnerHome() {
               <h2 className="text-xl font-bold text-gray-900">Reservas</h2>
               <div className="flex flex-wrap items-center gap-4">
                 <button
-                  onClick={() => setShowHistoryModal(true)}
+                  onClick={() => {setFiltroLocalHistorico("");
+                                  setFiltroDataHistorico("");
+                                  setShowHistoryModal(true)}
+                          }
                   className="text-xs font-bold py-2.5 px-4 rounded-xl transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2 h-10 shadow-sm"
                 >
                   <History className="w-4 h-4" />
@@ -744,26 +749,26 @@ export default function OwnerHome() {
                 <div className="flex items-center gap-2 h-10">
                   <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Local:</span>
                   <select
-                    value={filtroLocalSindico}
-                    onChange={e => setFiltroLocalSindico(e.target.value)}
+                    value={filtroLocalHistorico}
+                    onChange={e => setFiltroLocalHistorico(e.target.value)}
                     className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                   >
                     <option value="">Todos</option>
                     {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
                   </select>
-                  {filtroLocalSindico && <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
+                  {filtroLocalHistorico && <button onClick={() => setFiltroLocalHistorico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                 </div>
                 
                 <div className="flex items-center gap-2 h-10">
                   <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Filtrar por data:</span>
                   <div className="w-40 h-full">
                     <InputData
-                      value={filtroDataSindico}
-                      onChange={(val) => setFiltroDataSindico(val)}
+                      value={filtroDataHistorico}
+                      onChange={(val) => setFiltroDataHistorico(val)}
                       className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                     />
                   </div>
-                  {filtroDataSindico && <button onClick={() => setFiltroDataSindico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
+                  {filtroDataHistorico && <button onClick={() => setFiltroDataHistorico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                 </div>
               </div>
             </div>
@@ -773,8 +778,8 @@ export default function OwnerHome() {
                   const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
                   const reservasFiltradas = reservas
                     .filter(r => (r.data as string) >= hojeString && r.status !== 'CANCELADA')
-                    .filter(r => !filtroDataSindico || r.data === filtroDataSindico)
-                    .filter(r => !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico)
+                    .filter(r => !filtroDataHistorico || r.data === filtroDataHistorico)
+                    .filter(r => !filtroLocalHistorico || r.local?.id.toString() === filtroLocalHistorico)
                     .sort((a, b) => {
                       const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
                       const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
@@ -782,7 +787,7 @@ export default function OwnerHome() {
                     });
 
                   if (reservasFiltradas.length === 0) {
-                    return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva programada{filtroDataSindico ? ' para esta data' : ''}{filtroLocalSindico ? ' neste local' : ''}.</p>;
+                    return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva programada{filtroDataHistorico ? ' para esta data' : ''}{filtroLocalHistorico ? ' neste local' : ''}.</p>;
                   }
 
                   return (
