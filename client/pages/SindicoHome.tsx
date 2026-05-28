@@ -22,7 +22,7 @@ import {
 } from "@/services/api";
 import type { UsuarioDTOResponse, LocalDTO, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 import { getSenhasProvisoras, salvarSenhaProvisora, removerSenhaProvisora, sincronizarSenhas, type SenhasMap } from "@/services/senhasProvisoras";
-import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff, History } from "lucide-react";
+import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff, History, ChevronRight } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -72,11 +72,19 @@ export default function OwnerHome() {
   const [showDeleteReservaModal, setShowDeleteReservaModal] = useState(false);
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [filtroDataSindico, setFiltroDataSindico] = useState("");
+  
   const [filtroLocalSindico, setFiltroLocalSindico] = useState("");
-  const [filtroDataHistorico, setFiltroDataHistorico] = useState("");
   const [filtroLocalHistorico, setFiltroLocalHistorico] = useState("");
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  const [dataInicioDashboard, setDataInicioDashboard] = useState("");
+  const [dataFimDashboard, setDataFimDashboard] = useState("");
+
+  const [dataInicioReserva, setDataInicioReserva] = useState("");
+  const [dataFimReserva, setDataFimReserva] = useState("");
+
+  const [dataInicioModal, setDataInicioModal] = useState("");
+  const [dataFimModal, setDataFimModal] = useState("");
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -161,7 +169,7 @@ export default function OwnerHome() {
 
     try {
       const resp = await criarUsuario({
-        node: userFormData.nome,
+        nome: userFormData.nome,
         email: userFormData.email,
         cpf: cleanCpf,
         telefone: cleanTelefone || undefined,
@@ -393,11 +401,9 @@ export default function OwnerHome() {
   }
 
   function formatarData(data: string) {
-    const d = new Date(data + "T00:00:00");
-    const dia = String(d.getDate()).padStart(2, '0');
-    const mes = String(d.getMonth() + 1).padStart(2, '0');
-    const ano = d.getFullYear();
-    return `${dia}/${mes}/${ano}`;
+    if (!data) return "";
+    const [a, m, d] = data.split('-');
+    return `${d}/${m}/${a}`;
   }
 
   function formatarHora(hora: string) {
@@ -536,18 +542,22 @@ export default function OwnerHome() {
                 </div>
 
                 <div className="flex items-center gap-2 h-10">
-                  <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Mês:</span>
-                  <div className="w-44 h-full">
-                    <InputData
-                      value={filtroDataSindico}
-                      onChange={(val) => setFiltroDataSindico(val)}
-                      isMonthSelect={true}
-                      className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                  <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Período:</span>
+                  <div className="h-full">
+                    <CalendarRangePicker
+                      startDate={dataInicioDashboard}
+                      endDate={dataFimDashboard}
+                      onChange={(start, end) => {
+                        setDataInicioDashboard(start);
+                        setDataFimDashboard(end);
+                      }}
+                      onClear={() => {
+                        setDataInicioDashboard("");
+                        setDataFimDashboard("");
+                      }}
                     />
                   </div>
-                  {filtroDataSindico && <button onClick={() => setFiltroDataSindico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                 </div>
-
               </div>
             </div>
 
@@ -555,8 +565,16 @@ export default function OwnerHome() {
               const reservasFiltradasDashboard = reservas.filter(r => {
                 const isAprovada = r.status === 'APROVADA';
                 const matchesLocal = !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico;
-                const matchesMes = !filtroDataSindico || r.data?.startsWith(filtroDataSindico);
-                return isAprovada && matchesLocal && matchesMes;
+                
+                let matchesPeriod = true;
+                const dataRes = r.data as string;
+                if (dataInicioDashboard && dataFimDashboard) {
+                  matchesPeriod = dataRes >= dataInicioDashboard && dataRes <= dataFimDashboard;
+                } else if (dataInicioDashboard) {
+                  matchesPeriod = dataRes === dataInicioDashboard;
+                }
+
+                return isAprovada && matchesLocal && matchesPeriod;
               });
 
               const contagemLocais = reservasFiltradasDashboard.reduce((acc, r) => {
@@ -736,10 +754,12 @@ export default function OwnerHome() {
               <h2 className="text-xl font-bold text-gray-900">Reservas</h2>
               <div className="flex flex-wrap items-center gap-4">
                 <button
-                  onClick={() => {setFiltroLocalHistorico("");
-                                  setFiltroDataHistorico("");
-                                  setShowHistoryModal(true)}
-                          }
+                  onClick={() => {
+                    setFiltroLocalHistorico("");
+                    setDataInicioModal("");
+                    setDataFimModal("");
+                    setShowHistoryModal(true)
+                  }}
                   className="text-xs font-bold py-2.5 px-4 rounded-xl transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2 h-10 shadow-sm"
                 >
                   <History className="w-4 h-4" />
@@ -760,15 +780,21 @@ export default function OwnerHome() {
                 </div>
                 
                 <div className="flex items-center gap-2 h-10">
-                  <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Filtrar por data:</span>
-                  <div className="w-40 h-full">
-                    <InputData
-                      value={filtroDataHistorico}
-                      onChange={(val) => setFiltroDataHistorico(val)}
-                      className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                  <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Período:</span>
+                  <div className="h-full">
+                    <CalendarRangePicker
+                      startDate={dataInicioReserva}
+                      endDate={dataFimReserva}
+                      onChange={(start, end) => {
+                        setDataInicioReserva(start);
+                        setDataFimReserva(end);
+                      }}
+                      onClear={() => {
+                        setDataInicioReserva("");
+                        setDataFimReserva("");
+                      }}
                     />
                   </div>
-                  {filtroDataHistorico && <button onClick={() => setFiltroDataHistorico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                 </div>
               </div>
             </div>
@@ -778,7 +804,13 @@ export default function OwnerHome() {
                   const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
                   const reservasFiltradas = reservas
                     .filter(r => (r.data as string) >= hojeString && r.status !== 'CANCELADA')
-                    .filter(r => !filtroDataHistorico || r.data === filtroDataHistorico)
+                    .filter(r => {
+                      if (!dataInicioReserva) return true;
+                      if (dataInicioReserva && dataFimReserva) {
+                        return (r.data as string) >= dataInicioReserva && (r.data as string) <= dataFimReserva;
+                      }
+                      return r.data === dataInicioReserva;
+                    })
                     .filter(r => !filtroLocalHistorico || r.local?.id.toString() === filtroLocalHistorico)
                     .sort((a, b) => {
                       const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
@@ -787,7 +819,7 @@ export default function OwnerHome() {
                     });
 
                   if (reservasFiltradas.length === 0) {
-                    return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva programada{filtroDataHistorico ? ' para esta data' : ''}{filtroLocalHistorico ? ' neste local' : ''}.</p>;
+                    return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva programada{dataInicioReserva ? ' para o período' : ''}{filtroLocalHistorico ? ' neste local' : ''}.</p>;
                   }
 
                   return (
@@ -807,12 +839,12 @@ export default function OwnerHome() {
                               <span className="text-gray-500 text-xs font-normal">{r.morador?.email}</span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-semibold">{r.local?.nome}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data as string)}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
                               {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status)}`}>
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status as string)}`}>
                                 {r.status}
                               </span>
                             </td>
@@ -843,9 +875,9 @@ export default function OwnerHome() {
           </div>
         )}
 
-        {showHistoryModal && (
+      {showHistoryModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-4">
               <div className="p-6 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <h3 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
                   <History className="w-6 h-6 text-accent" />
@@ -859,8 +891,7 @@ export default function OwnerHome() {
                 </button>
               </div>
 
-              <div className="p-6 sm:p-8 overflow-y-auto">
-                
+              <div className="p-6 sm:p-8 overflow-visible min-h-[450px] flex flex-col">
                 <div className="flex flex-wrap justify-end mb-6 gap-4">
                   <div className="flex items-center gap-2 h-10">
                     <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Local:</span>
@@ -876,25 +907,37 @@ export default function OwnerHome() {
                   </div>
                   
                   <div className="flex items-center gap-2 h-10">
-                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Filtrar por data:</span>
-                    <div className="w-40 h-full">
-                      <InputData
-                        value={filtroDataSindico}
-                        onChange={(val) => setFiltroDataSindico(val)}
-                        className="h-full w-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Período:</span>
+                    <div className="h-full">
+                      <CalendarRangePicker
+                        startDate={dataInicioModal}
+                        endDate={dataFimModal}
+                        onChange={(start, end) => {
+                          setDataInicioModal(start);
+                          setDataFimModal(end);
+                        }}
+                        onClear={() => {
+                          setDataInicioModal("");
+                          setDataFimModal("");
+                        }}
                       />
                     </div>
-                    {filtroDataSindico && <button onClick={() => setFiltroDataSindico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex-1">
                   <div className="overflow-x-auto">
                     {(() => {
                       const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
                       const reservasFiltradas = reservas
                         .filter(r => (r.data as string) < hojeString || r.status === 'CANCELADA')
-                        .filter(r => !filtroDataSindico || r.data === filtroDataSindico)
+                        .filter(r => {
+                          if (!dataInicioModal) return true;
+                          if (dataInicioModal && dataFimModal) {
+                            return (r.data as string) >= dataInicioModal && (r.data as string) <= dataFimModal;
+                          }
+                          return r.data === dataInicioModal;
+                        })
                         .filter(r => !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico)
                         .sort((a, b) => {
                           const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
@@ -923,12 +966,12 @@ export default function OwnerHome() {
                                   <span className="text-gray-500 text-xs font-normal">{r.morador?.email}</span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.local?.nome}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data as string)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
                                   {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status)}`}>
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status as string)}`}>
                                     {r.status}
                                   </span>
                                 </td>
@@ -1257,59 +1300,149 @@ function isReservaExpirada(r: ReservaDTOResponse) {
   return resDate.getTime() < agora.getTime();
 }
 
-function InputData({ value, onChange, className, min, isMonthSelect = false }: { value: string, onChange: (v: string) => void, className?: string, min?: string, isMonthSelect?: boolean }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+function CalendarRangePicker({ startDate, endDate, onChange, onClear }: { startDate: string, endDate: string, onChange: (s: string, e: string) => void, onClear: () => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date());
+  const popoverRef = useRef<HTMLDivElement>(null);
 
-  const formatDateToBRL = (dateStr: string) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length === 2) {
-      return `${parts[1]}/${parts[0]}`;
-    }
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  };
-
-  const handleDisplayClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (inputRef.current) {
-      if ('showPicker' in HTMLInputElement.prototype) {
-        inputRef.current.showPicker();
-      } else {
-        inputRef.current.focus();
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
       }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const formatarDataLocal = (d: string) => {
+    if (!d) return "";
+    const [y, m, dia] = d.split('-');
+    return `${dia}/${m}/${y}`;
+  };
+
+  const formatDisplay = () => {
+    if (startDate && endDate) {
+      return `${formatarDataLocal(startDate)} - ${formatarDataLocal(endDate)}`;
+    } else if (startDate) {
+      return formatarDataLocal(startDate);
+    }
+    return "Selecione o período";
+  };
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+  const startDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+  const dias = [];
+  for (let i = 0; i < startDay; i++) dias.push(null);
+  for (let i = 1; i <= daysInMonth; i++) {
+    dias.push(new Date(year, month, i));
+  }
+
+  const handleDayClick = (d: Date) => {
+    const dYear = d.getFullYear();
+    const dMonth = String(d.getMonth() + 1).padStart(2, '0');
+    const dDay = String(d.getDate()).padStart(2, '0');
+    const dStr = `${dYear}-${dMonth}-${dDay}`;
+
+    if (!startDate || (startDate && endDate)) {
+      onChange(dStr, "");
+    } else {
+      if (dStr < startDate) {
+        onChange(dStr, startDate);
+      } else {
+        onChange(startDate, dStr);
+      }
+      setIsOpen(false);
     }
   };
+
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   return (
-    <div className="relative w-full h-full inline-block">
-      <input
-        type="text"
-        value={formatDateToBRL(value)}
-        onClick={handleDisplayClick}
-        readOnly
-        placeholder={isMonthSelect ? "mm/aaaa" : "dd/mm/aaaa"}
-        className={`${className} w-full h-full pl-3 pr-10 cursor-pointer text-left`}
-      />
-      
-      <svg
-        onClick={handleDisplayClick}
-        className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 cursor-pointer pointer-events-auto"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
+    <div className="relative inline-block h-full" ref={popoverRef}>
+      <div
+        className="flex items-center justify-between h-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 cursor-pointer shadow-sm hover:border-accent min-w-[200px]"
+        onClick={() => setIsOpen(!isOpen)}
       >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-500" />
+          <span>{formatDisplay()}</span>
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            className="ml-2 text-red-500 hover:text-red-700"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-      <input
-        ref={inputRef}
-        type={isMonthSelect ? "month" : "date"}
-        value={value}
-        min={min}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer pointer-events-none"
-      />
+      {isOpen && (
+        <div className="absolute top-full mt-2 left-0 z-50 bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 w-72">
+          <div className="flex justify-between items-center mb-4">
+            <span className="font-semibold text-gray-800 text-lg">
+              {monthNames[month]}, {year}
+            </span>
+            <div className="flex gap-1">
+              <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="p-1 hover:bg-gray-100 rounded-lg">
+                <ChevronRight className="w-5 h-5 text-gray-600 rotate-180" />
+              </button>
+              <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="p-1 hover:bg-gray-100 rounded-lg">
+                <ChevronRight className="w-5 h-5 text-green-700" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 text-center mb-2">
+            {["seg", "ter", "qua", "qui", "sex", "sáb", "dom"].map(d => (
+              <div key={d} className="text-[11px] font-semibold text-gray-400 uppercase py-2">{d}</div>
+            ))}
+            {dias.map((d, i) => {
+              if (!d) return <div key={`empty-${i}`} className="h-10" />;
+              
+              const dYear = d.getFullYear();
+              const dMonth = String(d.getMonth() + 1).padStart(2, '0');
+              const dDay = String(d.getDate()).padStart(2, '0');
+              const dStr = `${dYear}-${dMonth}-${dDay}`;
+
+              const isStart = dStr === startDate;
+              const isEnd = dStr === endDate;
+              const isBetween = startDate && endDate && dStr > startDate && dStr < endDate;
+              
+              const todayStr = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+              const isToday = dStr === todayStr;
+
+              let wrapperClasses = "h-10 flex justify-center w-full my-1 ";
+              if (isBetween) wrapperClasses += "bg-[#f2fcdb]";
+              if (isStart && endDate && dStr !== endDate) wrapperClasses += "bg-[#f2fcdb] rounded-l-xl";
+              if (isEnd && dStr !== startDate) wrapperClasses += "bg-[#f2fcdb] rounded-r-xl";
+
+              let innerClasses = "w-10 h-10 flex items-center justify-center text-sm cursor-pointer ";
+              if (isStart || isEnd) {
+                innerClasses += "bg-[#6ec207] text-white rounded-xl shadow-sm font-bold";
+              } else if (isBetween) {
+                innerClasses += "text-[#3e6b05] font-medium";
+              } else {
+                innerClasses += "text-gray-700 hover:bg-gray-100 rounded-xl font-medium";
+                if (isToday) innerClasses += " border border-gray-200 bg-gray-50";
+              }
+
+              return (
+                <div key={dStr} className={wrapperClasses}>
+                  <div onClick={() => handleDayClick(d)} className={innerClasses}>
+                    {d.getDate()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1516,3 +1649,4 @@ function FormLocal({ data, onChange, error, onCancel, onSubmit, submitLabel }: {
     </div>
   );
 }
+

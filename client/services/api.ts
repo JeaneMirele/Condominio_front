@@ -293,8 +293,8 @@ export async function getReservas(): Promise<ReservaDTOResponse[]> {
   return http<ReservaDTOResponse[]>("/reservas");
 }
 
-export async function getReservasfiltroData(data: string): Promise<ReservaDTOResponse[]> {
-  return http<ReservaDTOResponse[]>(`/reservas?data=${data}`);
+export async function getReservasfiltroData(dataInicio: string, dataFim: string): Promise<ReservaDTOResponse[]> {
+  return http<ReservaDTOResponse[]>(`/reservas/data?dataInicio=${dataInicio}&dataFim=${dataFim}`);
 }
 
 export async function getReservasfiltroId(id: number): Promise<ReservaDTOResponse[]> {
