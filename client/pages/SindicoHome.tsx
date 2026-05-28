@@ -875,118 +875,125 @@ export default function OwnerHome() {
           </div>
         )}
 
-      {showHistoryModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-in slide-in-from-bottom-4">
-              <div className="p-6 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h3 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-                  <History className="w-6 h-6 text-accent" />
-                  Histórico de Reservas
-                </h3>
-                <button
-                  onClick={() => setShowHistoryModal(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shadow-sm"
+          {showHistoryModal && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+        {/* 1. Modal maior: max-w-5xl e altura fixa de 90vh */}
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col animate-in slide-in-from-bottom-4">
+          
+          {/* Header do Modal */}
+          <div className="p-6 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
+            <h3 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+              <History className="w-6 h-6 text-accent" />
+              Histórico de Reservas
+            </h3>
+            <button
+              onClick={() => setShowHistoryModal(false)}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shadow-sm"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* 2. Corpo do Modal: flex-1 para ocupar o espaço, overflow-y-auto para rolagem geral, e pb-64 para dar espaço ao calendário */}
+          <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-64 custom-scrollbar">
+            
+            <div className="flex flex-wrap justify-end mb-6 gap-4 relative z-10">
+              <div className="flex items-center gap-2 h-10">
+                <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Local:</span>
+                <select
+                  value={filtroLocalSindico}
+                  onChange={(e) => setFiltroLocalSindico(e.target.value)}
+                  className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
                 >
-                  <X className="w-5 h-5" />
-                </button>
+                  <option value="">Todos</option>
+                  {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
+                </select>
+                {filtroLocalSindico && <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
               </div>
-
-              <div className="p-6 sm:p-8 overflow-visible min-h-[450px] flex flex-col">
-                <div className="flex flex-wrap justify-end mb-6 gap-4">
-                  <div className="flex items-center gap-2 h-10">
-                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Local:</span>
-                    <select
-                      value={filtroLocalSindico}
-                      onChange={(e) => setFiltroLocalSindico(e.target.value)}
-                      className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
-                    >
-                      <option value="">Todos</option>
-                      {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
-                    </select>
-                    {filtroLocalSindico && <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
-                  </div>
-                  
-                  <div className="flex items-center gap-2 h-10">
-                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Período:</span>
-                    <div className="h-full">
-                      <CalendarRangePicker
-                        startDate={dataInicioModal}
-                        endDate={dataFimModal}
-                        onChange={(start, end) => {
-                          setDataInicioModal(start);
-                          setDataFimModal(end);
-                        }}
-                        onClear={() => {
-                          setDataInicioModal("");
-                          setDataFimModal("");
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex-1">
-                  <div className="overflow-x-auto">
-                    {(() => {
-                      const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
-                      const reservasFiltradas = reservas
-                        .filter(r => (r.data as string) < hojeString || r.status === 'CANCELADA')
-                        .filter(r => {
-                          if (!dataInicioModal) return true;
-                          if (dataInicioModal && dataFimModal) {
-                            return (r.data as string) >= dataInicioModal && (r.data as string) <= dataFimModal;
-                          }
-                          return r.data === dataInicioModal;
-                        })
-                        .filter(r => !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico)
-                        .sort((a, b) => {
-                          const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
-                          const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
-                          return dateB.getTime() - dateA.getTime();
-                        });
-
-                      if (reservasFiltradas.length === 0) {
-                        return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva passada encontrada.</p>;
-                      }
-
-                      return (
-                        <table className="w-full">
-                          <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-200 text-left">
-                              {["Morador", "Local", "Data", "Hora", "Status"].map((h) => (
-                                <th key={h} className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {reservasFiltradas.map((r) => (
-                              <tr key={r.id} className="hover:bg-gray-50/50 transition-colors group opacity-85">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                  {r.morador?.nome}<br />
-                                  <span className="text-gray-500 text-xs font-normal">{r.morador?.email}</span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.local?.nome}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data as string)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                                  {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status as string)}`}>
-                                    {r.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      );
-                    })()}
-                  </div>
+              
+              <div className="flex items-center gap-2 h-10">
+                <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Período:</span>
+                <div className="h-full">
+                  <CalendarRangePicker
+                    startDate={dataInicioModal}
+                    endDate={dataFimModal}
+                    onChange={(start, end) => {
+                      setDataInicioModal(start);
+                      setDataFimModal(end);
+                    }}
+                    onClear={() => {
+                      setDataInicioModal("");
+                      setDataFimModal("");
+                    }}
+                  />
                 </div>
               </div>
             </div>
+
+            {/* 3. Container da tabela limpo, sem hacks de scroll interno */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto min-w-full">
+                {(() => {
+                  const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                  const reservasFiltradas = reservas
+                    .filter(r => (r.data as string) < hojeString || r.status === 'CANCELADA')
+                    .filter(r => {
+                      if (!dataInicioModal) return true;
+                      if (dataInicioModal && dataFimModal) {
+                        return (r.data as string) >= dataInicioModal && (r.data as string) <= dataFimModal;
+                      }
+                      return r.data === dataInicioModal;
+                    })
+                    .filter(r => !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico)
+                    .sort((a, b) => {
+                      const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
+                      const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
+                      return dateB.getTime() - dateA.getTime();
+                    });
+
+                  if (reservasFiltradas.length === 0) {
+                    return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva passada encontrada.</p>;
+                  }
+
+                  return (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50/50 border-b border-gray-200 text-left">
+                          {["Morador", "Local", "Data", "Hora", "Status"].map((h) => (
+                            <th key={h} className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {reservasFiltradas.map((r) => (
+                          <tr key={r.id} className="hover:bg-gray-50/50 transition-colors group opacity-85">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {r.morador?.nome}<br />
+                              <span className="text-gray-500 text-xs font-normal">{r.morador?.email}</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.local?.nome}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data as string)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                              {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status as string)}`}>
+                                {r.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
+              </div>
+            </div>
+
           </div>
-        )}
+        </div>
+      </div>
+    )}
 
         {activeTab === "areas" && (
           <div className="space-y-6">
@@ -1299,7 +1306,6 @@ function isReservaExpirada(r: ReservaDTOResponse) {
   const resDate = new Date(dateStr);
   return resDate.getTime() < agora.getTime();
 }
-
 function CalendarRangePicker({ startDate, endDate, onChange, onClear }: { startDate: string, endDate: string, onChange: (s: string, e: string) => void, onClear: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
@@ -1383,7 +1389,7 @@ function CalendarRangePicker({ startDate, endDate, onChange, onClear }: { startD
       </div>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 left-0 z-50 bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 w-72">
+        <div className="absolute top-full mt-2 right-0 z-50 bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 w-72 max-w-[90vw]">
           <div className="flex justify-between items-center mb-4">
             <span className="font-semibold text-gray-800 text-lg">
               {monthNames[month]}, {year}
