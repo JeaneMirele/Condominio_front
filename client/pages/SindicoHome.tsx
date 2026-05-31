@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
 import {
   getUsuarios,
@@ -24,7 +26,11 @@ import {
 } from "@/services/api";
 import type { UsuarioDTOResponse, LocalDTO, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 import { getSenhasProvisoras, salvarSenhaProvisora, removerSenhaProvisora, sincronizarSenhas, type SenhasMap } from "@/services/senhasProvisoras";
-import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff, History, ChevronRight, Filter, Search } from "lucide-react";
+import { 
+  Users, Clock, Settings, LogOut, Menu, X, Camera, User, 
+  LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, 
+  EyeOff, History, ChevronRight, Filter, Search, Download 
+} from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -75,12 +81,10 @@ export default function OwnerHome() {
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   
-  // Dashboard states
   const [filtroLocalSindico, setFiltroLocalSindico] = useState("");
   const [dataInicioDashboard, setDataInicioDashboard] = useState("");
   const [dataFimDashboard, setDataFimDashboard] = useState("");
 
-  // NOVO: Sidebar Filtros Reservations
   const [viewType, setViewType] = useState<"programadas" | "historico">("programadas");
   const [filtroStatus, setFiltroStatus] = useState<string[]>([]);
   const [filtroMorador, setFiltroMorador] = useState("");
@@ -340,6 +344,67 @@ export default function OwnerHome() {
     </button>
   );
 
+  function handleExportarPDF() {
+    const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
+    const reservasExport = reservas.filter(r => {
+      const isPassadaOuCancelada = (r.data as string) < hojeString || r.status === 'CANCELADA';
+      
+      if (viewType === 'programadas' && isPassadaOuCancelada) return false;
+      if (viewType === 'historico' && !isPassadaOuCancelada) return false;
+      if (filtroStatus.length > 0 && !filtroStatus.includes(r.status as string)) return false;
+      if (filtroLocalBusca && r.local?.id.toString() !== filtroLocalBusca) return false;
+      
+      if (filtroMorador) {
+        const termo = filtroMorador.toLowerCase();
+        const nomeMatch = r.morador?.nome?.toLowerCase().includes(termo);
+        const idMatch = r.morador?.id?.toString() === termo;
+        if (!nomeMatch && !idMatch) return false;
+      }
+      
+      if (dataInicioBusca && dataFimBusca) {
+        if ((r.data as string) < dataInicioBusca || (r.data as string) > dataFimBusca) return false;
+      } else if (dataInicioBusca) {
+        if (r.data !== dataInicioBusca) return false;
+      }
+      return true;
+    }).sort((a, b) => {
+      const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
+      const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
+      return viewType === 'programadas' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+    });
+
+    if (reservasExport.length === 0) {
+      toast.error("Nenhuma reserva encontrada para os filtros atuais.");
+      return;
+    }
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(14);
+    doc.text(`Relatório de Reservas - ${viewType === 'programadas' ? 'Programadas' : 'Histórico'}`, 14, 15);
+
+    const tableColumn = ["Morador", "Local", "Data", "Horário", "Status"];
+    const tableRows = reservasExport.map(r => [
+      r.morador?.nome || "",
+      r.local?.nome || "",
+      formatarData(r.data as string),
+      `${formatarHora(r.horaEntrada as string)} - ${formatarHora(r.horaSaida as string)}`,
+      r.status || ""
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [99, 102, 241] }
+    });
+
+    doc.save(`Reservas_${viewType}.pdf`);
+  }
+  
   async function handleSalvarPerfil() {
     if (!usuarioLogado?.id) return;
     setSavingProfile(true);
@@ -579,6 +644,22 @@ export default function OwnerHome() {
                 return isAprovada && matchesLocal && matchesPeriod;
               });
 
+              const reservasTodosStatus = reservas.filter(r => {
+                const matchesLocal = !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico;
+                
+                let matchesPeriod = true;
+                const dataRes = r.data as string;
+                if (dataInicioDashboard && dataFimDashboard) {
+                  matchesPeriod = dataRes >= dataInicioDashboard && dataRes <= dataFimDashboard;
+                } else if (dataInicioDashboard) {
+                  matchesPeriod = dataRes === dataInicioDashboard;
+                }
+
+                return matchesLocal && matchesPeriod;
+              });
+
+              const totalTodasReservas = reservasTodosStatus.length;
+
               const contagemLocais = reservasFiltradasDashboard.reduce((acc, r) => {
                 const nome = r.local?.nome || 'Desconhecido';
                 acc[nome] = (acc[nome] || 0) + 1;
@@ -617,6 +698,10 @@ export default function OwnerHome() {
                 Quantidade: contagemDias[index] || 0
               }));
 
+              const dadosGraficoHorarios = Object.entries(contagemHorarios)
+                .map(([name, count]) => ({ name, Quantidade: count }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+
               return (
                 <div className="space-y-8">
                   
@@ -629,10 +714,23 @@ export default function OwnerHome() {
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
-                      <div className="min-w-[48px] min-h-[48px] py-2 px-4 bg-blue-50 rounded-xl flex items-center justify-center mb-3">
-                        <span className="text-sm font-black text-blue-600 whitespace-normal break-all line-clamp-2 max-w-[140px]">{areaMaisReservada}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mais Reservada ({qtdAreaMaisReservada})</span>
+                      {filtroLocalSindico ? (
+                        <>
+                          <div className="min-w-[48px] h-12 px-3 bg-blue-50 rounded-xl flex items-center justify-center mb-3">
+                            <span className="text-2xl font-black text-blue-600 whitespace-normal break-all line-clamp-2 max-w-[140px]">
+                              {totalTodasReservas}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total de Reservas</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="min-w-[48px] min-h-[48px] py-2 px-4 bg-blue-50 rounded-xl flex items-center justify-center mb-3">
+                            <span className="text-sm font-black text-blue-600 whitespace-normal break-all line-clamp-2 max-w-[140px]">{areaMaisReservada}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mais Reservada ({qtdAreaMaisReservada})</span>
+                        </>
+                      )}
                     </div>
 
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center text-center">
@@ -653,18 +751,20 @@ export default function OwnerHome() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     
                     <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
-                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">Quantidade por Área de Lazer</h3>
+                      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8 text-center sm:text-left">
+                        {filtroLocalSindico ? "Frequência por Horário" : "Quantidade por Área de Lazer"}
+                      </h3>
                       <div className="flex-1 min-h-[300px] relative">
-                        {dadosGraficoBarras.length === 0 ? (
+                        {(filtroLocalSindico ? dadosGraficoHorarios : dadosGraficoBarras).length === 0 ? (
                           <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm italic">Sem dados aprovados no filtro selecionado</div>
                         ) : (
                           <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dadosGraficoBarras} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <BarChart data={filtroLocalSindico ? dadosGraficoHorarios : dadosGraficoBarras} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                               <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
                               <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#9CA3AF', fontWeight: 600 }} axisLine={false} tickLine={false} />
                               <Tooltip cursor={{ fill: '#F9FAFB' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                              <Bar dataKey="Quantidade" fill="#6366f1" radius={[8, 8, 0, 0]} barSize={32} />
+                              <Bar dataKey="Quantidade" fill={filtroLocalSindico ? "#f59e0b" : "#6366f1"} radius={[8, 8, 0, 0]} barSize={32} />
                             </BarChart>
                           </ResponsiveContainer>
                         )}
@@ -751,20 +851,26 @@ export default function OwnerHome() {
         )}
 
         {activeTab === "reservations" && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Reservas de Espaços</h2>
+         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Reservas de Espaços</h2>
+              <button
+                onClick={handleExportarPDF}
+                className="bg-accent hover:bg-accent/90 text-white font-bold text-xs py-3 px-6 rounded-2xl shadow-lg shadow-accent/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Exportar PDF
+              </button>
+            </div>
             
-            {/* Layout com Sidebar Lateral para Filtros */}
             <div className="flex flex-col lg:flex-row gap-6 items-start">
               
-              {/* ASIDE - FILTROS (Estilo E-commerce) */}
               <aside className="w-full lg:w-72 bg-white rounded-3xl shadow-sm border border-gray-200 p-6 shrink-0 lg:sticky lg:top-28 z-10">
                 <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
                   <Filter className="w-5 h-5 text-accent" />
                   <h3 className="font-bold text-gray-900 text-lg">Filtros</h3>
                 </div>
 
-                {/* 1. Filtro por Local */}
                 <div className="mb-6">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Por Área de Lazer</label>
                   <select
@@ -777,7 +883,6 @@ export default function OwnerHome() {
                   </select>
                 </div>
 
-                {/* 2. Filtro por Período */}
                 <div className="mb-6">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Por Período</label>
                   <div className="h-12 w-full">
@@ -796,9 +901,8 @@ export default function OwnerHome() {
                   </div>
                 </div>
 
-                {/* 3. Filtro por Morador */}
                 <div className="mb-6">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Por Morador </label>
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3"> Por Morador </label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -811,7 +915,6 @@ export default function OwnerHome() {
                   </div>
                 </div>
 
-                {/* 4. Filtro por Status da Reserva */}
                 <div className="mb-6">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Status da Reserva</label>
                   <div className="space-y-2">
@@ -832,7 +935,6 @@ export default function OwnerHome() {
                   </div>
                 </div>
 
-                {/* 5. Tela de Exibição */}
                 <div className="mb-2">
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Tipo de Exibição</label>
                   <div className="space-y-2">
@@ -847,7 +949,6 @@ export default function OwnerHome() {
                   </div>
                 </div>
 
-                {/* Botão Limpar Filtros */}
                 {(filtroStatus.length > 0 || filtroMorador || filtroLocalBusca || dataInicioBusca) && (
                   <button
                     onClick={() => {
@@ -860,27 +961,21 @@ export default function OwnerHome() {
                 )}
               </aside>
 
-              {/* MAIN CONTENT - TABELA DE RESULTADOS */}
               <div className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden w-full">
                 <div className="overflow-x-auto min-w-full">
                   {(() => {
                     const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
                     
-                    // Aplicação unificada dos filtros locais (para não impactar performance global do dashboard)
                     const reservasFiltradasTabela = reservas
                       .filter(r => {
-                        // Regra de Exibição (Programadas vs Histórico)
                         const isPassadaOuCancelada = (r.data as string) < hojeString || r.status === 'CANCELADA';
                         if (viewType === 'programadas' && isPassadaOuCancelada) return false;
                         if (viewType === 'historico' && !isPassadaOuCancelada) return false;
 
-                        // Filtro Status
                         if (filtroStatus.length > 0 && !filtroStatus.includes(r.status as string)) return false;
 
-                        // Filtro Local
                         if (filtroLocalBusca && r.local?.id.toString() !== filtroLocalBusca) return false;
 
-                        // Filtro Morador
                         if (filtroMorador) {
                           const termo = filtroMorador.toLowerCase();
                           const nomeMatch = r.morador?.nome?.toLowerCase().includes(termo);
@@ -888,7 +983,6 @@ export default function OwnerHome() {
                           if (!nomeMatch && !idMatch) return false;
                         }
 
-                        // Filtro Período
                         if (dataInicioBusca && dataFimBusca) {
                           if ((r.data as string) < dataInicioBusca || (r.data as string) > dataFimBusca) return false;
                         } else if (dataInicioBusca) {
@@ -900,7 +994,6 @@ export default function OwnerHome() {
                       .sort((a, b) => {
                         const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
                         const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
-                        // Ordenação crescrente para futuras, decrescente para histórico
                         return viewType === 'programadas' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
                       });
 
