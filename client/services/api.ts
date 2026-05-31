@@ -322,6 +322,13 @@ export async function deletarReserva(id: number): Promise<ReservaDTOResponse> {
 export async function getHorariosDoLocal(idLocal: number, data: string): Promise<any[]> {
   return http<any[]>(`/reservas/${idLocal}/${data}`);
 }
+export async function getReservasPorStatus(status: string): Promise<any[]> {
+  return http<any[]>(`/reservas/status/${status}`);
+}
+
+export async function getReservasPorMorador(id: number): Promise<any[]> {
+  return http<any[]>(`/reservas/morador/${id}`);
+}
 
 // ─── Unidades ──────────────────────────────────────────────────────────────
 

@@ -18,11 +18,13 @@ import {
   clearSession,
   uploadFotoPerfil,
   alterarSenha,
+  getReservasPorStatus,
+  getReservasPorMorador,
   BASE_URL
 } from "@/services/api";
 import type { UsuarioDTOResponse, LocalDTO, LocalDTOResponse, ReservaDTOResponse } from "@/services/types";
 import { getSenhasProvisoras, salvarSenhaProvisora, removerSenhaProvisora, sincronizarSenhas, type SenhasMap } from "@/services/senhasProvisoras";
-import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff, History, ChevronRight } from "lucide-react";
+import { Users, Clock, Settings, LogOut, Menu, X, Camera, User, LayoutDashboard, ShieldAlert, ListChecks, Calendar, Eye, EyeOff, History, ChevronRight, Filter, Search } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -73,18 +75,18 @@ export default function OwnerHome() {
   const [selectedReserva, setSelectedReserva] = useState<ReservaDTOResponse | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   
+  // Dashboard states
   const [filtroLocalSindico, setFiltroLocalSindico] = useState("");
-  const [filtroLocalHistorico, setFiltroLocalHistorico] = useState("");
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-
   const [dataInicioDashboard, setDataInicioDashboard] = useState("");
   const [dataFimDashboard, setDataFimDashboard] = useState("");
 
-  const [dataInicioReserva, setDataInicioReserva] = useState("");
-  const [dataFimReserva, setDataFimReserva] = useState("");
-
-  const [dataInicioModal, setDataInicioModal] = useState("");
-  const [dataFimModal, setDataFimModal] = useState("");
+  // NOVO: Sidebar Filtros Reservations
+  const [viewType, setViewType] = useState<"programadas" | "historico">("programadas");
+  const [filtroStatus, setFiltroStatus] = useState<string[]>([]);
+  const [filtroMorador, setFiltroMorador] = useState("");
+  const [filtroLocalBusca, setFiltroLocalBusca] = useState("");
+  const [dataInicioBusca, setDataInicioBusca] = useState("");
+  const [dataFimBusca, setDataFimBusca] = useState("");
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -202,7 +204,7 @@ export default function OwnerHome() {
       });
       setShowEditUserModal(false);
       await carregarTudo();
-      toast.success("Dados updated!");
+      toast.success("Dados atualizados!");
     } catch (err: any) {
       setFormError(err.message ?? "Erro ao atualizar.");
     }
@@ -390,7 +392,7 @@ export default function OwnerHome() {
     setUploadingFoto(true);
     try {
       await uploadFotoPerfil(file);
-      toast.success("Foto updated com sucesso!");
+      toast.success("Foto atualizada com sucesso!");
       const novoPerfil = await getMeuPerfil();
       setUsuarioLogado(novoPerfil);
     } catch (err: any) {
@@ -479,7 +481,7 @@ export default function OwnerHome() {
       </aside>
 
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-3 sm:px-6 lg:px-8 sm:py-5 font-inter">
+        <div className="max-w-[1400px] mx-auto px-4 py-3 sm:px-6 lg:px-8 sm:py-5 font-inter">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <button
@@ -498,7 +500,7 @@ export default function OwnerHome() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 sm:py-12">
+      <main className="max-w-[1400px] mx-auto px-4 py-6 sm:px-6 lg:px-8 sm:py-12">
 
         <div className="flex gap-2 mb-10 border-b border-gray-200 overflow-x-auto pb-px">
           {(["overview", "areas", "reservations", "managers", "syndics"] as ActiveTab[]).map((tab) => {
@@ -749,251 +751,224 @@ export default function OwnerHome() {
         )}
 
         {activeTab === "reservations" && (
-          <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Reservas</h2>
-              <div className="flex flex-wrap items-center gap-4">
-                <button
-                  onClick={() => {
-                    setFiltroLocalHistorico("");
-                    setDataInicioModal("");
-                    setDataFimModal("");
-                    setShowHistoryModal(true)
-                  }}
-                  className="text-xs font-bold py-2.5 px-4 rounded-xl transition-all bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-2 h-10 shadow-sm"
-                >
-                  <History className="w-4 h-4" />
-                  Ver Histórico
-                </button>
-                
-                <div className="flex items-center gap-2 h-10">
-                  <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Local:</span>
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Reservas de Espaços</h2>
+            
+            {/* Layout com Sidebar Lateral para Filtros */}
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              
+              {/* ASIDE - FILTROS (Estilo E-commerce) */}
+              <aside className="w-full lg:w-72 bg-white rounded-3xl shadow-sm border border-gray-200 p-6 shrink-0 lg:sticky lg:top-28 z-10">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
+                  <Filter className="w-5 h-5 text-accent" />
+                  <h3 className="font-bold text-gray-900 text-lg">Filtros</h3>
+                </div>
+
+                {/* 1. Filtro por Local */}
+                <div className="mb-6">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Por Área de Lazer</label>
                   <select
-                    value={filtroLocalHistorico}
-                    onChange={e => setFiltroLocalHistorico(e.target.value)}
-                    className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
+                    value={filtroLocalBusca}
+                    onChange={(e) => setFiltroLocalBusca(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all cursor-pointer"
                   >
-                    <option value="">Todos</option>
+                    <option value="">Todas as áreas</option>
                     {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
                   </select>
-                  {filtroLocalHistorico && <button onClick={() => setFiltroLocalHistorico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
                 </div>
-                
-                <div className="flex items-center gap-2 h-10">
-                  <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Período:</span>
-                  <div className="h-full">
+
+                {/* 2. Filtro por Período */}
+                <div className="mb-6">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Por Período</label>
+                  <div className="h-12 w-full">
                     <CalendarRangePicker
-                      startDate={dataInicioReserva}
-                      endDate={dataFimReserva}
+                      startDate={dataInicioBusca}
+                      endDate={dataFimBusca}
                       onChange={(start, end) => {
-                        setDataInicioReserva(start);
-                        setDataFimReserva(end);
+                        setDataInicioBusca(start);
+                        setDataFimBusca(end);
                       }}
                       onClear={() => {
-                        setDataInicioReserva("");
-                        setDataFimReserva("");
+                        setDataInicioBusca("");
+                        setDataFimBusca("");
                       }}
                     />
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                {(() => {
-                  const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
-                  const reservasFiltradas = reservas
-                    .filter(r => (r.data as string) >= hojeString && r.status !== 'CANCELADA')
-                    .filter(r => {
-                      if (!dataInicioReserva) return true;
-                      if (dataInicioReserva && dataFimReserva) {
-                        return (r.data as string) >= dataInicioReserva && (r.data as string) <= dataFimReserva;
-                      }
-                      return r.data === dataInicioReserva;
-                    })
-                    .filter(r => !filtroLocalHistorico || r.local?.id.toString() === filtroLocalHistorico)
-                    .sort((a, b) => {
-                      const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
-                      const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
-                      return dateA.getTime() - dateB.getTime();
-                    });
 
-                  if (reservasFiltradas.length === 0) {
-                    return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva programada{dataInicioReserva ? ' para o período' : ''}{filtroLocalHistorico ? ' neste local' : ''}.</p>;
-                  }
+                {/* 3. Filtro por Morador */}
+                <div className="mb-6">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Por Morador </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="João"
+                      value={filtroMorador}
+                      onChange={(e) => setFiltroMorador(e.target.value)}
+                      className="w-full pl-9 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
+                    />
+                  </div>
+                </div>
 
-                  return (
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50/50 border-b border-gray-100 text-left">
-                          {["Morador", "Local", "Data", "Hora", "Status", "Ações"].map((h) => (
-                            <th key={h} className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {reservasFiltradas.map((r) => (
-                          <tr key={r.id} className="hover:bg-gray-50/50 transition-colors group">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {r.morador?.nome}<br />
-                              <span className="text-gray-500 text-xs font-normal">{r.morador?.email}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-semibold">{r.local?.nome}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data as string)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                              {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status as string)}`}>
-                                {r.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <div className="flex justify-end gap-2">
-                                {r.status !== 'CANCELADA' && !isReservaExpirada(r) && (
-                                  <button
-                                    onClick={() => {
-                                      setSelectedReserva(r);
-                                      setShowDeleteReservaModal(true);
-                                    }}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-50"
-                                    title="Cancelar Reserva"
-                                  >
-                                    <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
-                                  </button>
-                                )}
-                              </div>
-                            </td>
+                {/* 4. Filtro por Status da Reserva */}
+                <div className="mb-6">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Status da Reserva</label>
+                  <div className="space-y-2">
+                    {['APROVADA', 'PENDENTE', 'CANCELADA'].map(status => (
+                      <label key={status} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={filtroStatus.includes(status)}
+                          onChange={(e) => {
+                            if(e.target.checked) setFiltroStatus([...filtroStatus, status]);
+                            else setFiltroStatus(filtroStatus.filter(s => s !== status));
+                          }}
+                          className="rounded text-accent focus:ring-accent w-4 h-4"
+                        />
+                        <span className="text-sm font-medium text-gray-700">{status}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 5. Tela de Exibição */}
+                <div className="mb-2">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Tipo de Exibição</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors border border-transparent has-[:checked]:border-accent has-[:checked]:bg-accent/5">
+                      <input type="radio" name="viewType" checked={viewType === 'programadas'} onChange={() => setViewType('programadas')} className="text-accent focus:ring-accent" />
+                      <span className="text-sm font-semibold text-gray-700">Reservas Programadas</span>
+                    </label>
+                    <label className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors border border-transparent has-[:checked]:border-accent has-[:checked]:bg-accent/5">
+                      <input type="radio" name="viewType" checked={viewType === 'historico'} onChange={() => setViewType('historico')} className="text-accent focus:ring-accent" />
+                      <span className="text-sm font-semibold text-gray-700">Histórico de Reservas</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Botão Limpar Filtros */}
+                {(filtroStatus.length > 0 || filtroMorador || filtroLocalBusca || dataInicioBusca) && (
+                  <button
+                    onClick={() => {
+                      setFiltroStatus([]); setFiltroMorador(''); setFiltroLocalBusca(''); setDataInicioBusca(''); setDataFimBusca('');
+                    }}
+                    className="w-full mt-6 text-xs font-bold text-red-500 hover:text-red-600 hover:underline py-2 text-center"
+                  >
+                    Limpar Filtros
+                  </button>
+                )}
+              </aside>
+
+              {/* MAIN CONTENT - TABELA DE RESULTADOS */}
+              <div className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden w-full">
+                <div className="overflow-x-auto min-w-full">
+                  {(() => {
+                    const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
+                    
+                    // Aplicação unificada dos filtros locais (para não impactar performance global do dashboard)
+                    const reservasFiltradasTabela = reservas
+                      .filter(r => {
+                        // Regra de Exibição (Programadas vs Histórico)
+                        const isPassadaOuCancelada = (r.data as string) < hojeString || r.status === 'CANCELADA';
+                        if (viewType === 'programadas' && isPassadaOuCancelada) return false;
+                        if (viewType === 'historico' && !isPassadaOuCancelada) return false;
+
+                        // Filtro Status
+                        if (filtroStatus.length > 0 && !filtroStatus.includes(r.status as string)) return false;
+
+                        // Filtro Local
+                        if (filtroLocalBusca && r.local?.id.toString() !== filtroLocalBusca) return false;
+
+                        // Filtro Morador
+                        if (filtroMorador) {
+                          const termo = filtroMorador.toLowerCase();
+                          const nomeMatch = r.morador?.nome?.toLowerCase().includes(termo);
+                          const idMatch = r.morador?.id?.toString() === termo;
+                          if (!nomeMatch && !idMatch) return false;
+                        }
+
+                        // Filtro Período
+                        if (dataInicioBusca && dataFimBusca) {
+                          if ((r.data as string) < dataInicioBusca || (r.data as string) > dataFimBusca) return false;
+                        } else if (dataInicioBusca) {
+                          if (r.data !== dataInicioBusca) return false;
+                        }
+
+                        return true;
+                      })
+                      .sort((a, b) => {
+                        const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
+                        const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
+                        // Ordenação crescrente para futuras, decrescente para histórico
+                        return viewType === 'programadas' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+                      });
+
+                    if (reservasFiltradasTabela.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+                          <Search className="w-12 h-12 text-gray-200 mb-4" />
+                          <p className="text-gray-500 font-medium">Nenhuma reserva encontrada com os filtros atuais.</p>
+                          <p className="text-sm text-gray-400 mt-2">Tente ajustar o período ou o status da busca.</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-gray-50/50 border-b border-gray-100">
+                            {["Morador", "Local", "Data", "Hora", "Status", "Ações"].map((h) => (
+                              <th key={h} className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                            ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  );
-                })()}
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {reservasFiltradasTabela.map((r) => (
+                            <tr key={r.id} className={`hover:bg-gray-50/50 transition-colors group ${viewType === 'historico' ? 'opacity-85' : ''}`}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {r.morador?.nome}<br />
+                                <span className="text-gray-500 text-xs font-normal">{r.morador?.email}</span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-semibold">{r.local?.nome}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data as string)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                                {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status as string)}`}>
+                                  {r.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div className="flex justify-start gap-2">
+                                  {viewType === 'programadas' && r.status !== 'CANCELADA' && !isReservaExpirada(r) ? (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedReserva(r);
+                                        setShowDeleteReservaModal(true);
+                                      }}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-50"
+                                      title="Cancelar Reserva"
+                                    >
+                                      <span className="text-xs font-bold uppercase tracking-wider">Cancelar</span>
+                                    </button>
+                                  ) : (
+                                    <span className="text-gray-300 text-xs">—</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
           </div>
         )}
-
-          {showHistoryModal && (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
-        {/* 1. Modal maior: max-w-5xl e altura fixa de 90vh */}
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col animate-in slide-in-from-bottom-4">
-          
-          {/* Header do Modal */}
-          <div className="p-6 sm:p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-            <h3 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-              <History className="w-6 h-6 text-accent" />
-              Histórico de Reservas
-            </h3>
-            <button
-              onClick={() => setShowHistoryModal(false)}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shadow-sm"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* 2. Corpo do Modal: flex-1 para ocupar o espaço, overflow-y-auto para rolagem geral, e pb-64 para dar espaço ao calendário */}
-          <div className="p-6 sm:p-8 overflow-y-auto flex-1 pb-64 custom-scrollbar">
-            
-            <div className="flex flex-wrap justify-end mb-6 gap-4 relative z-10">
-              <div className="flex items-center gap-2 h-10">
-                <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Local:</span>
-                <select
-                  value={filtroLocalSindico}
-                  onChange={(e) => setFiltroLocalSindico(e.target.value)}
-                  className="h-full px-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-accent shadow-sm"
-                >
-                  <option value="">Todos</option>
-                  {locais.map(l => <option key={l.id} value={l.id.toString()}>{l.nome}</option>)}
-                </select>
-                {filtroLocalSindico && <button onClick={() => setFiltroLocalSindico("")} className="text-xs text-red-500 font-semibold hover:underline">Limpar</button>}
-              </div>
-              
-              <div className="flex items-center gap-2 h-10">
-                <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Período:</span>
-                <div className="h-full">
-                  <CalendarRangePicker
-                    startDate={dataInicioModal}
-                    endDate={dataFimModal}
-                    onChange={(start, end) => {
-                      setDataInicioModal(start);
-                      setDataFimModal(end);
-                    }}
-                    onClear={() => {
-                      setDataInicioModal("");
-                      setDataFimModal("");
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Container da tabela limpo, sem hacks de scroll interno */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto min-w-full">
-                {(() => {
-                  const hojeString = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
-                  const reservasFiltradas = reservas
-                    .filter(r => (r.data as string) < hojeString || r.status === 'CANCELADA')
-                    .filter(r => {
-                      if (!dataInicioModal) return true;
-                      if (dataInicioModal && dataFimModal) {
-                        return (r.data as string) >= dataInicioModal && (r.data as string) <= dataFimModal;
-                      }
-                      return r.data === dataInicioModal;
-                    })
-                    .filter(r => !filtroLocalSindico || r.local?.id.toString() === filtroLocalSindico)
-                    .sort((a, b) => {
-                      const dateA = new Date((a.data as string || "") + "T" + (a.horaEntrada as string || "00:00"));
-                      const dateB = new Date((b.data as string || "") + "T" + (b.horaEntrada as string || "00:00"));
-                      return dateB.getTime() - dateA.getTime();
-                    });
-
-                  if (reservasFiltradas.length === 0) {
-                    return <p className="text-gray-500 text-sm text-center py-12">Nenhuma reserva passada encontrada.</p>;
-                  }
-
-                  return (
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50/50 border-b border-gray-200 text-left">
-                          {["Morador", "Local", "Data", "Hora", "Status"].map((h) => (
-                            <th key={h} className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {reservasFiltradas.map((r) => (
-                          <tr key={r.id} className="hover:bg-gray-50/50 transition-colors group opacity-85">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {r.morador?.nome}<br />
-                              <span className="text-gray-500 text-xs font-normal">{r.morador?.email}</span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{r.local?.nome}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatarData(r.data as string)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                              {formatarHora(r.horaEntrada as string)} – {formatarHora(r.horaSaida as string)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${badgeStatus(r.status as string)}`}>
-                                {r.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  );
-                })()}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    )}
 
         {activeTab === "areas" && (
           <div className="space-y-6">
@@ -1306,6 +1281,7 @@ function isReservaExpirada(r: ReservaDTOResponse) {
   const resDate = new Date(dateStr);
   return resDate.getTime() < agora.getTime();
 }
+
 function CalendarRangePicker({ startDate, endDate, onChange, onClear }: { startDate: string, endDate: string, onChange: (s: string, e: string) => void, onClear: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
@@ -1369,19 +1345,19 @@ function CalendarRangePicker({ startDate, endDate, onChange, onClear }: { startD
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   return (
-    <div className="relative inline-block h-full" ref={popoverRef}>
+    <div className="relative inline-block h-full w-full" ref={popoverRef}>
       <div
-        className="flex items-center justify-between h-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 cursor-pointer shadow-sm hover:border-accent min-w-[200px]"
+        className="flex items-center justify-between h-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 cursor-pointer shadow-sm focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all min-w-[200px]"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-500" />
-          <span>{formatDisplay()}</span>
+        <div className="flex items-center gap-2 overflow-hidden">
+          <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+          <span className="truncate">{formatDisplay()}</span>
         </div>
         {(startDate || endDate) && (
           <button
             onClick={(e) => { e.stopPropagation(); onClear(); }}
-            className="ml-2 text-red-500 hover:text-red-700"
+            className="ml-2 text-red-500 hover:text-red-700 p-1"
           >
             <X className="w-4 h-4" />
           </button>
@@ -1389,7 +1365,7 @@ function CalendarRangePicker({ startDate, endDate, onChange, onClear }: { startD
       </div>
 
       {isOpen && (
-        <div className="absolute top-full mt-2 right-0 z-50 bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 w-72 max-w-[90vw]">
+        <div className="absolute top-full mt-2 right-0 lg:left-0 z-50 bg-white border border-gray-100 shadow-2xl rounded-2xl p-4 w-72 max-w-[90vw]">
           <div className="flex justify-between items-center mb-4">
             <span className="font-semibold text-gray-800 text-lg">
               {monthNames[month]}, {year}
@@ -1655,4 +1631,3 @@ function FormLocal({ data, onChange, error, onCancel, onSubmit, submitLabel }: {
     </div>
   );
 }
-
